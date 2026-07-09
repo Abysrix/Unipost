@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Loader from "@/components/layout/Loader";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -22,6 +22,26 @@ import FinalCTA from "@/components/sections/FinalCTA";
 export default function Home() {
   const [started, setStarted] = useState(false);
   const onComplete = useCallback(() => setStarted(true), []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const next = params.get("next");
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+
+      if (code) {
+        let dest = `/auth/callback?code=${encodeURIComponent(code)}`;
+        if (next) dest += `&next=${encodeURIComponent(next)}`;
+        window.location.replace(dest);
+      } else if (tokenHash && type) {
+        let dest = `/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}`;
+        if (next) dest += `&next=${encodeURIComponent(next)}`;
+        window.location.replace(dest);
+      }
+    }
+  }, []);
 
   return (
     <>
