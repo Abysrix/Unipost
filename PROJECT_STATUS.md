@@ -346,7 +346,7 @@ Auth is being built **from scratch in Sprint 1.**
 ## ⚙️ Supabase setup required before auth works end-to-end
 1. Create a Supabase project → **Settings → API**: copy `URL`, `anon` key, `service_role` key into `.env.local`.
 2. **Authentication → URL Configuration:** Site URL = `http://localhost:3000` (+ prod URL later);
-   Redirect allow-list must include `http://localhost:3000/auth/callback` and `/auth/confirm`.
+   Redirect allow-list must include `http://unipost-seven.vercel.app/auth/callback` and `/auth/confirm`.
 3. **Authentication → Providers → Google:** enable and paste Google OAuth client ID/secret.
 4. (Optional) toggle "Confirm email" per preference. Restart `npm run dev` after editing `.env.local`.
 5. **Run migrations `supabase/migrations/0001–0004`** (SQL editor or CLI) so posts + AI + scheduling tables exist.
