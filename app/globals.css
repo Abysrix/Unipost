@@ -25,12 +25,6 @@
   padding: 0;
 }
 
-/* Custom cursor drives interactivity; hide the native one on fine pointers */
-@media (pointer: fine) {
-  * {
-    cursor: none !important;
-  }
-}
 
 html {
   -webkit-font-smoothing: antialiased;

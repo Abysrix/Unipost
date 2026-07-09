@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { MotionConfig } from "framer-motion";
 import { useLenis } from "@/hooks/useLenis";
 import { ease } from "@/lib/tokens";
-import CustomCursor from "@/components/cursor/CustomCursor";
 import ScrollProgress from "@/components/layout/ScrollProgress";
 import OfflineBanner from "@/components/layout/OfflineBanner";
 
@@ -34,7 +33,6 @@ export default function AppProviders({ children }: { children: React.ReactNode }
 
   return (
     <MotionConfig reducedMotion="never" transition={{ ease: [...ease.expo] }}>
-      <CustomCursor />
       <ScrollProgress />
       <OfflineBanner />
       {children}
