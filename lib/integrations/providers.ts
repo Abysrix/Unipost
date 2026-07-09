@@ -92,7 +92,12 @@ export const PROVIDER_CONFIGS: Record<PlatformId, OAuthProviderConfig> = {
     tokenUrl: "https://oauth2.googleapis.com/token",
     profileUrl: "https://www.googleapis.com/oauth2/v3/userinfo",
     revokeUrl: "https://oauth2.googleapis.com/revoke",
-    scopes: ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/youtube.upload"],
+    scopes: [
+      "https://www.googleapis.com/auth/youtube.readonly",
+      "https://www.googleapis.com/auth/youtube.upload",
+      "openid",
+      "profile"
+    ],
     clientIdEnv: "YOUTUBE_CLIENT_ID",
     clientSecretEnv: "YOUTUBE_CLIENT_SECRET",
     profileFields: { id: "sub", name: "name", avatar: "picture" },
