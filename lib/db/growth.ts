@@ -71,6 +71,10 @@ async function ensureAnalyticsSeeded(platforms: PlatformId[], publishDatesByPlat
   if (insErr) throw insErr;
 }
 
+export async function seedAnalyticsForPlatform(platform: PlatformId): Promise<void> {
+  await ensureAnalyticsSeeded([platform], new Map());
+}
+
 /* ── Creator Score ── */
 const SCORE_COLS =
   "id,user_id,score,grade,consistency,frequency,engagement,platform_activity,growth,ai_utilization,content_quality,computed_at,created_at";

@@ -7,6 +7,7 @@ import { encryptToken, decryptToken } from "@/lib/integrations/crypto";
 import { isTokenNearExpiry, isAuthError, withRetry, type SyncOutcome } from "@/lib/integrations/sync";
 import { getCurrentPlan } from "@/lib/db/plan";
 import { planLimits } from "@/lib/billing/plans";
+import { seedAnalyticsForPlatform } from "@/lib/db/growth";
 import type {
   ConnectedAccount, ConnectionWithPermissions, PlatformPermission,
   SyncLog, SyncType, IntegrationEvent, IntegrationEventType, ProviderProfile, ProviderTokens,
@@ -169,6 +170,7 @@ export async function completeConnection(platform: PlatformId, profile: Provider
   await saveTokens(account.id, userId, tokens);
   await savePermissions(account.id, userId, platform, tokens.scope);
   await logEvent(userId, platform, isReconnect ? "reconnected" : "connected", account.id, `${isReconnect ? "Reconnected" : "Connected"} ${profile.displayName}`);
+  await seedAnalyticsForPlatform(platform).catch(() => {});
 
   return account;
 }
@@ -229,6 +231,8 @@ export async function syncAccount(id: string, type: SyncType = "manual"): Promis
       .from("connected_accounts")
       .update({ display_name: profile.displayName, username: profile.username ?? account.username, profile_image: profile.profileImage ?? account.profile_image, status: "connected", last_sync_at: new Date().toISOString(), last_error: null })
       .eq("id", id);
+
+    await seedAnalyticsForPlatform(account.platform).catch(() => {});
 
     await logSync(userId, id, type, "success");
     await logEvent(userId, account.platform, "sync_completed", id, "Sync completed");
