@@ -35,13 +35,14 @@ export function createMetadata({
       siteName: siteConfig.name,
       type: "website",
       locale: siteConfig.locale,
-      images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: siteConfig.name }],
+      // No explicit `images` here — app/opengraph-image.tsx (file convention)
+      // is auto-detected and injected by Next.js. siteConfig.ogImage pointed
+      // at a /og.png that never existed; don't reintroduce that path.
     },
     twitter: {
       card: "summary_large_image",
       title: fullTitle,
       description,
-      images: [siteConfig.ogImage],
       creator: siteConfig.twitterHandle,
     },
     robots: { index: true, follow: true },

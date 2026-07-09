@@ -75,7 +75,7 @@ export default function Footer() {
 
           {Object.entries(footerNav).map(([section, links]) => (
             <div key={section}>
-              <h4 className="mb-4 font-mono text-[10px] uppercase tracking-[0.2em] text-white/25">{section}</h4>
+              <h3 className="mb-4 font-mono text-[10px] uppercase tracking-[0.2em] text-white/25">{section}</h3>
               <ul className="flex flex-col gap-2.5">
                 {links.map((link) => {
                   const external = "external" in link && link.external;

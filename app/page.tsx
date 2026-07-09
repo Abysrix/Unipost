@@ -28,7 +28,14 @@ export default function Home() {
       {!started && <Loader onComplete={onComplete} />}
       {started && <Navbar />}
 
-      <main>
+      {/* inert while the loader overlays this: without it, Tab can reach Hero's
+          real buttons underneath before they're visually revealed. @types/react
+          types `inert` as boolean, but React 18's runtime (unlike 19+) doesn't
+          special-case it as one — passing the JS boolean `true` literally
+          serializes as the string "true" rather than a present/absent HTML
+          attribute. The cast keeps the correct runtime output (empty-string
+          attribute) while satisfying the (here, simply wrong) prop type. */}
+      <main inert={!started ? ("" as unknown as true) : undefined}>
         <Hero start={started} />
         <TrustBar />
         <Analytics />

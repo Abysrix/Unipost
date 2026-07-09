@@ -14,7 +14,6 @@ export const siteConfig = {
   description:
     "UniPost is India's Creator Operating System — plan, create, schedule, publish, analyze, grow and monetize across every platform in one AI-native workspace.",
   locale: "en_IN",
-  ogImage: "/og.png",
   twitterHandle: "@unipost",
   email: "hello@unipost.bharvix.com",
   keywords: [
@@ -44,7 +43,7 @@ export const mainNav: NavItem[] = [
   { label: "Pricing", href: "#pricing", enabled: false },
 ];
 
-export const primaryCta = { label: "Get Early Access", href: "#early-access" } as const;
+export const primaryCta = { label: "Get Early Access", href: "/signup" } as const;
 
 export const footerNav = {
   Product: [

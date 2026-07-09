@@ -32,3 +32,8 @@ next-env.d.ts
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# local AI-tooling config (not part of the app)
+.agents/
+.claude/skills/
+skills-lock.json

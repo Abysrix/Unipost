@@ -68,7 +68,7 @@ export default function FinalCTA() {
           </motion.p>
 
           <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.45 }} className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Button href="#early-access" variant="aurora" size="lg" arrow cursorLabel="Start">Start Free Trial</Button>
+            <Button href="/signup" variant="aurora" size="lg" arrow cursorLabel="Start">Start Free Trial</Button>
             <Button href="#early-access" variant="secondary" size="lg" cursorLabel="Book">
               <span className="inline-flex items-center gap-2"><Calendar size={14} /> Book Demo</span>
             </Button>

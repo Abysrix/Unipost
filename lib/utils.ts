@@ -37,6 +37,33 @@ export function formatNumber(n: number, locale = "en-IN"): string {
   return new Intl.NumberFormat(locale).format(n);
 }
 
+/** Compact relative time, e.g. "just now", "3m ago", "2h ago", "Apr 12". */
+export function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const s = Math.round((Date.now() - then) / 1000);
+  if (s < 45) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  if (s < 604800) return `${Math.round(s / 86400)}d ago`;
+  return new Date(then).toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+}
+
+/** Count words in a string. */
+export function wordCount(text: string): number {
+  const t = text.trim();
+  return t ? t.split(/\s+/).length : 0;
+}
+
+/**
+ * Guards a redirect target from sending users off-site. `//evil.com` passes
+ * a naive `startsWith("/")` check (browsers resolve protocol-relative URLs
+ * against the current scheme) — reject those too, not just `http(s)://`.
+ */
+export function isSafeRedirect(path: unknown): path is string {
+  return typeof path === "string" && path.startsWith("/") && !path.startsWith("//");
+}
+
 /** The house easing curves, as cubic-bezier arrays (Framer-ready). */
 export const EASES = {
   expo: [0.16, 1, 0.3, 1],

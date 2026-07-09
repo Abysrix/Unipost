@@ -113,7 +113,7 @@ export default function Hero({ start = true }: { start?: boolean }) {
             </p>
 
             <div data-anim="buttons" className="flex flex-wrap items-center gap-4">
-              <Button href="#early-access" variant="aurora" size="lg" arrow cursorLabel="Start">
+              <Button href="/signup" variant="aurora" size="lg" arrow cursorLabel="Start">
                 Start Free Trial
               </Button>
               <Button variant="secondary" size="lg" magnetic onClick={() => setDemoOpen(true)} cursorLabel="Play">
