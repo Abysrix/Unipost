@@ -104,8 +104,26 @@ export function providerConfig(platform: PlatformId): OAuthProviderConfig {
   return PROVIDER_CONFIGS[platform];
 }
 
+export function getClientId(config: OAuthProviderConfig): string | undefined {
+  const primary = process.env[config.clientIdEnv];
+  if (primary) return primary;
+  if (config.platform === "youtube") {
+    return process.env.GOOGLE_CLIENT_ID;
+  }
+  return undefined;
+}
+
+export function getClientSecret(config: OAuthProviderConfig): string | undefined {
+  const primary = process.env[config.clientSecretEnv];
+  if (primary) return primary;
+  if (config.platform === "youtube") {
+    return process.env.GOOGLE_CLIENT_SECRET;
+  }
+  return undefined;
+}
+
 /** True once a real client id/secret are set for this platform. */
 export function hasRealCredentials(platform: PlatformId): boolean {
   const c = PROVIDER_CONFIGS[platform];
-  return Boolean(process.env[c.clientIdEnv] && process.env[c.clientSecretEnv]);
+  return Boolean(getClientId(c) && getClientSecret(c));
 }

@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import type { PlatformId } from "@/config/platforms";
 import type { ProviderProfile, ProviderTokens } from "@/types/integrations";
-import { providerConfig, hasRealCredentials } from "./providers";
+import { providerConfig, hasRealCredentials, getClientId, getClientSecret } from "./providers";
 
 /**
  * Generic OAuth 2.0 engine — operates entirely off `OAuthProviderConfig`, so it
@@ -64,7 +64,7 @@ export function buildAuthorizeUrl(platform: PlatformId, state: string, redirectU
     return `/integrations/connect/${platform}?state=${encodeURIComponent(state)}`;
   }
   const url = new URL(config.authorizeUrl);
-  url.searchParams.set("client_id", process.env[config.clientIdEnv] as string);
+  url.searchParams.set("client_id", getClientId(config) as string);
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", config.scopes.join(" "));
@@ -105,8 +105,8 @@ export async function exchangeCode(
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri,
-    client_id: process.env[config.clientIdEnv] as string,
-    client_secret: process.env[config.clientSecretEnv] as string,
+    client_id: getClientId(config) as string,
+    client_secret: getClientSecret(config) as string,
   });
   const tokenRes = await fetch(config.tokenUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
   if (!tokenRes.ok) throw new Error(`${config.displayName} token exchange failed (${tokenRes.status}).`);
@@ -129,8 +129,8 @@ export async function refreshAccessToken(platform: PlatformId, refreshToken: str
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    client_id: process.env[config.clientIdEnv] as string,
-    client_secret: process.env[config.clientSecretEnv] as string,
+    client_id: getClientId(config) as string,
+    client_secret: getClientSecret(config) as string,
   });
   const res = await fetch(config.tokenUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
   if (!res.ok) throw new Error(`${config.displayName} token refresh failed (${res.status}).`);
