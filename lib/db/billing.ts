@@ -52,6 +52,15 @@ export async function getOrCreateSubscription(): Promise<Subscription> {
     await logEvent(userId, "subscription_created", "Started on the Free plan");
   }
 
+  // Ensure Free plan users have their current period's credits seeded/reset (idempotent via key)
+  if (sub.plan === "free") {
+    try {
+      await grantCredits("monthly_reset", monthlyAllotment("free"), `reset:${userId}:${currentPeriod()}`);
+    } catch {
+      /* best-effort credit reset */
+    }
+  }
+
   return applyPeriodRollover(sub);
 }
 

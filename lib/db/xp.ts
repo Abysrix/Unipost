@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { XP_AWARDS, type XpReason } from "@/lib/growth/xp";
 import type { XpEvent } from "@/types/growth";
@@ -42,6 +43,25 @@ export async function awardXp(reason: XpReason, key?: string, meta: Record<strin
   const userId = await uid();
   try {
     const { error } = await supabase.from("xp_history").insert({
+      user_id: userId,
+      amount: XP_AWARDS[reason],
+      reason,
+      meta: key ? { ...meta, key } : meta,
+    });
+    if (error && !isUniqueViolation(error)) throw error;
+  } catch (e) {
+    if (!isUniqueViolation(e)) throw e;
+  }
+}
+
+/**
+ * Admin-level XP award for background tasks (e.g. cron schedule publishing).
+ * Uses the service-role client and directly accepts a target userId.
+ */
+export async function adminAwardXp(userId: string, reason: XpReason, key?: string, meta: Record<string, unknown> = {}): Promise<void> {
+  const admin = createAdminClient();
+  try {
+    const { error } = await admin.from("xp_history").insert({
       user_id: userId,
       amount: XP_AWARDS[reason],
       reason,

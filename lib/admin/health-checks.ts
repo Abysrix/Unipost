@@ -1,4 +1,6 @@
 import type { HealthCheck } from "@/types/admin";
+import { platforms } from "@/config/platforms";
+import { hasRealCredentials } from "@/lib/integrations/providers";
 
 /**
  * Platform Health — pure classification logic (Phase 5). Each check is a
@@ -12,6 +14,8 @@ function envConfigured(...keys: string[]): boolean {
 }
 
 export function computeHealthChecks(): HealthCheck[] {
+  const configuredProviders = platforms.filter((p) => hasRealCredentials(p.id)).map((p) => p.name);
+
   return [
     {
       component: "database",
@@ -33,9 +37,9 @@ export function computeHealthChecks(): HealthCheck[] {
     },
     {
       component: "gemini",
-      label: "Gemini API",
-      status: envConfigured("GEMINI_API_KEY") ? "healthy" : "warning",
-      message: envConfigured("GEMINI_API_KEY") ? "AI Studio, chat and Growth Coach are live." : "GEMINI_API_KEY not set — AI features return a friendly error.",
+      label: "OpenRouter API",
+      status: envConfigured("API_KEY") ? "healthy" : "warning",
+      message: envConfigured("API_KEY") ? "AI Studio, chat and Growth Coach are live via tencent/hy3:free." : "API_KEY not set — AI features return a friendly error.",
     },
     {
       component: "razorpay",
@@ -58,14 +62,18 @@ export function computeHealthChecks(): HealthCheck[] {
     {
       component: "scheduler_worker",
       label: "Scheduler / queue worker",
-      status: "unknown",
-      message: "No background worker exists yet — 'Publish now' is manual. A cron/edge-function worker is a known follow-up (Sprint 5).",
+      status: envConfigured("CRON_SECRET") ? "healthy" : "warning",
+      message: envConfigured("CRON_SECRET")
+        ? "Background queue worker active via cron endpoint /api/cron/publish."
+        : "Cron endpoint /api/cron/publish is present. Set CRON_SECRET in your environment to secure and enable background publishing.",
     },
     {
       component: "oauth_providers",
       label: "OAuth providers (per-platform)",
-      status: "unknown",
-      message: "No real platform developer-app credentials configured — connections run through the simulated consent screen (Sprint 7).",
+      status: configuredProviders.length > 0 ? "healthy" : "warning",
+      message: configuredProviders.length > 0
+        ? `Configured live OAuth apps for: ${configuredProviders.join(", ")}.`
+        : "No real platform credentials configured — connections run through simulated consent screens.",
     },
   ];
 }
@@ -86,10 +94,11 @@ export function envPresenceTable(): { key: string; label: string; present: boole
     { key: "NEXT_PUBLIC_SUPABASE_URL", label: "Supabase URL", present: envConfigured("NEXT_PUBLIC_SUPABASE_URL") },
     { key: "NEXT_PUBLIC_SUPABASE_ANON_KEY", label: "Supabase anon key", present: envConfigured("NEXT_PUBLIC_SUPABASE_ANON_KEY") },
     { key: "SUPABASE_SERVICE_ROLE_KEY", label: "Supabase service-role key", present: envConfigured("SUPABASE_SERVICE_ROLE_KEY") },
-    { key: "GEMINI_API_KEY", label: "Gemini API key", present: envConfigured("GEMINI_API_KEY") },
+    { key: "API_KEY", label: "OpenRouter API key", present: envConfigured("API_KEY") },
     { key: "RAZORPAY_KEY_ID", label: "Razorpay key ID", present: envConfigured("RAZORPAY_KEY_ID") },
     { key: "RAZORPAY_KEY_SECRET", label: "Razorpay key secret", present: envConfigured("RAZORPAY_KEY_SECRET") },
     { key: "RAZORPAY_WEBHOOK_SECRET", label: "Razorpay webhook secret", present: envConfigured("RAZORPAY_WEBHOOK_SECRET") },
     { key: "INTEGRATIONS_SECRET_KEY", label: "Integrations secret key", present: envConfigured("INTEGRATIONS_SECRET_KEY") },
+    { key: "CRON_SECRET", label: "Cron secret key", present: envConfigured("CRON_SECRET") },
   ];
 }

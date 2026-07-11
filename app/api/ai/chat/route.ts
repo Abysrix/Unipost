@@ -4,7 +4,7 @@ import { CHAT_SYSTEM } from "@/lib/ai/prompts";
 import { DEFAULT_MODEL, isModelId } from "@/lib/ai/models";
 import * as ai from "@/lib/db/ai";
 import { awardXp } from "@/lib/db/xp";
-import { spendCredits, getCreditBalance } from "@/lib/db/billing";
+import { spendCredits, getCreditBalance, getOrCreateSubscription } from "@/lib/db/billing";
 import { CHAT_MESSAGE_COST } from "@/lib/billing/credits";
 import { logAudit } from "@/lib/db/admin/audit";
 import { chatMessageSchema } from "@/lib/validations/ai";
@@ -24,7 +24,17 @@ export async function POST(req: Request) {
 
   // Fail CLOSED on a transient balance-check error — failing open here would let
   // one free message through per hiccup, indefinitely, under any sustained DB issue.
-  const balance = await getCreditBalance().catch(() => -1);
+  let balance = await getCreditBalance().catch(() => -1);
+  if (balance < CHAT_MESSAGE_COST) {
+    try {
+      // Lazy-create subscription and seed credits for new users or new periods
+      await getOrCreateSubscription();
+      balance = await getCreditBalance();
+    } catch {
+      /* best-effort fallback */
+    }
+  }
+
   if (balance < CHAT_MESSAGE_COST) {
     return new Response(`You're out of AI credits (${balance} left). Upgrade your plan or wait for your next monthly reset.`, { status: 402 });
   }

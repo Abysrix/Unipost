@@ -6,7 +6,7 @@ import { generateText, AIError } from "@/lib/ai/gemini";
 import { buildActionPrompt, type AIActionId, type ActionInput } from "@/lib/ai/prompts";
 import * as ai from "@/lib/db/ai";
 import { awardXp } from "@/lib/db/xp";
-import { spendCredits, getCreditBalance } from "@/lib/db/billing";
+import { spendCredits, getCreditBalance, getOrCreateSubscription } from "@/lib/db/billing";
 import { costForAction } from "@/lib/billing/credits";
 import { logAudit } from "@/lib/db/admin/audit";
 import { actionInputSchema, savePromptSchema } from "@/lib/validations/ai";
@@ -82,7 +82,16 @@ export async function runAction(action: AIActionId, input: ActionInput): Promise
 
   // Gate BEFORE spending a real Gemini call — an insufficient balance shouldn't
   // cost an API call. The atomic spend after generation re-checks for real.
-  const balance = await getCreditBalance();
+  let balance = await getCreditBalance();
+  if (balance < cost) {
+    try {
+      await getOrCreateSubscription();
+      balance = await getCreditBalance();
+    } catch {
+      /* best-effort */
+    }
+  }
+
   if (balance < cost) {
     return { error: `You're out of AI credits (${balance} left, this needs ${cost}). Upgrade your plan or wait for your next monthly reset.` };
   }
