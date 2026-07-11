@@ -19,6 +19,7 @@ import PostActions from "./PostActions";
 import ValidationMessage from "./ValidationMessage";
 import SaveIndicator, { type SaveStatus } from "./SaveIndicator";
 import ScheduleModal from "@/components/schedule/ScheduleModal";
+import AIWriteButton from "./AIWriteButton";
 
 const VISIBILITY: { value: PostVisibility; label: string; icon: typeof Globe }[] = [
   { value: "public", label: "Public", icon: Globe },
@@ -245,6 +246,23 @@ export default function CreateStudio({
 
           <WidgetContainer title="Media">
             <MediaUploader ref={mediaRef} userId={userId} media={media} onChange={(m) => { setMedia(m); markChanged(); }} />
+            {/* AI Write — analyze media and generate title + content */}
+            <div className="mt-3 flex items-center justify-between border-t border-white/[0.05] pt-3">
+              <p className="text-[11px] text-white/35">
+                {media.length > 0 ? "AI analyzes your media" : "Add media for AI context"}
+              </p>
+              <AIWriteButton
+                media={media}
+                platforms={platforms}
+                title={title}
+                content={content}
+                onApply={(newTitle, newContent) => {
+                  setTitle(newTitle);
+                  setContent(newContent);
+                  markChanged();
+                }}
+              />
+            </div>
           </WidgetContainer>
 
           <WidgetContainer title="Visibility">
