@@ -41,6 +41,19 @@ export async function schedulePost(input: ScheduleInput): Promise<ScheduleResult
       priority: parsed.data.priority,
       durationMin: parsed.data.durationMin,
     });
+
+    // Immediately upload to platforms that support native scheduling (YouTube, etc.)
+    // so the video appears in the platform's studio as "Scheduled" right away.
+    // Errors here are non-fatal — the schedule row exists and the cron will retry.
+    const nativePlatforms = new Set(["youtube"]);
+    const toUpload = created.filter((sp) => nativePlatforms.has(sp.platform));
+    if (toUpload.length > 0) {
+      // Fire-and-forget (best-effort) — we don't block the response on upload time
+      Promise.all(toUpload.map((sp) => db.publishNow(sp.id))).catch(() => {
+        /* non-fatal — cron will retry at scheduled_time */
+      });
+    }
+
     revalidate();
     return { scheduled: created };
   } catch (e) {
