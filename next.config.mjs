@@ -7,13 +7,13 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.supabase.co https://*.razorpay.com",
+  "img-src 'self' data: blob: https://*.supabase.co https://*.razorpay.com https://lh3.googleusercontent.com https://*.googleusercontent.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lumberjack.razorpay.com",
-  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://lumberjack.razorpay.com https://accounts.google.com https://oauth2.googleapis.com https://openrouter.ai https://www.googleapis.com",
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com https://accounts.google.com",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://accounts.google.com",
   "frame-ancestors 'none'",
 ].join("; ");
 
