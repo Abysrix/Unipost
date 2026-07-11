@@ -33,7 +33,7 @@ export async function processScheduledQueue(): Promise<{ processed: number; succ
   // Fetch candidate posts that are due (scheduled_time <= now) and in scheduled, queued, or failed states
   const { data, error } = await admin
     .from("scheduled_posts")
-    .select("id,user_id,post_id,platform,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,published_at,created_at,updated_at, post:posts(id,title,content,media)")
+    .select("id,user_id,post_id,platform,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,published_at,created_at,updated_at, post:posts(id,title,content,media,visibility)")
     .lte("scheduled_time", now)
     .in("status", ["scheduled", "queued", "failed"]);
 

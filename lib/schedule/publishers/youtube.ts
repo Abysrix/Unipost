@@ -48,16 +48,29 @@ export const youtubePublisher: PlatformPublisher = {
 
       const videoBlob = await fileRes.blob();
 
-      // 2. Build multipart body
+      // 2. Determine if this is a future-scheduled post — use YouTube's native scheduling
+      const scheduledAt = sp.scheduled_time ? new Date(sp.scheduled_time) : null;
+      const isFuture = scheduledAt && scheduledAt.getTime() > Date.now() + 60_000; // >1 min in future
+
+      const statusBlock = isFuture
+        ? {
+            privacyStatus: "private", // YouTube requires private for scheduled videos
+            publishAt: scheduledAt!.toISOString(),
+          }
+        : {
+            privacyStatus: sp.post?.visibility === "private" ? "private"
+              : sp.post?.visibility === "unlisted" ? "unlisted"
+              : "public",
+          };
+
+      // 3. Build multipart body
       const metadata = {
         snippet: {
           title: sp.post?.title || "Video from UniPost",
           description: sp.post?.content || "",
           categoryId: "22", // People & Blogs (default category)
         },
-        status: {
-          privacyStatus: "public", // Automatically publish public
-        },
+        status: statusBlock,
       };
 
       const boundary = "-------314159265358979323846";
@@ -81,7 +94,7 @@ export const youtubePublisher: PlatformPublisher = {
 
       const body = Buffer.concat(bodyParts);
 
-      // 3. Post upload request to Google/YouTube upload API
+      // 4. Post upload request to Google/YouTube upload API
       const uploadRes = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status", {
         method: "POST",
         headers: {
@@ -106,6 +119,7 @@ export const youtubePublisher: PlatformPublisher = {
   },
 
   async schedule(sp: ScheduledEvent) {
+    // Upload now with YouTube's native publishAt scheduling — YouTube handles the release
     return this.publish(sp);
   },
 

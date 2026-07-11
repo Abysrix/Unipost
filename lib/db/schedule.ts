@@ -17,7 +17,7 @@ async function uid(): Promise<string> {
 
 const SP_COLS =
   "id,user_id,post_id,platform,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,published_at,created_at,updated_at";
-const EVENT_SELECT = `${SP_COLS}, post:posts(id,title,content,media)`;
+const EVENT_SELECT = `${SP_COLS}, post:posts(id,title,content,media,visibility)`;
 
 /* ── Reads ── */
 export async function listEvents(fromIso?: string, toIso?: string): Promise<ScheduledEvent[]> {

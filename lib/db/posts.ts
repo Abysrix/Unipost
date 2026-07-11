@@ -83,7 +83,7 @@ async function propagatePublishedPostUpdates(postId: string): Promise<void> {
   // Find all successfully published schedules for this post that have an external ID
   const { data: schedules, error } = await admin
     .from("scheduled_posts")
-    .select("id,user_id,post_id,platform,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,published_at,created_at,updated_at,platform_post_id,connected_account_id, post:posts(id,title,content,media)")
+    .select("id,user_id,post_id,platform,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,published_at,created_at,updated_at,platform_post_id,connected_account_id, post:posts(id,title,content,media,visibility)")
     .eq("post_id", postId)
     .eq("status", "published")
     .not("platform_post_id", "is", null);

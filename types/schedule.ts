@@ -39,6 +39,7 @@ export interface SchedulePostRef {
   title: string;
   content: string;
   media: PostMedia[];
+  visibility?: "public" | "unlisted" | "private";
 }
 
 /** A scheduled post joined with its parent post (calendar/queue rendering). */
