@@ -22,9 +22,3 @@ export async function requireUser(): Promise<User> {
   if (!user) redirect("/login");
   return user;
 }
-
-/** Friendly display name from metadata or email. */
-export function displayName(user: User): string {
-  const meta = user.user_metadata as { full_name?: string; name?: string } | undefined;
-  return meta?.full_name ?? meta?.name ?? user.email?.split("@")[0] ?? "Creator";
-}

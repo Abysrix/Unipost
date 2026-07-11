@@ -81,14 +81,17 @@ export default function Particles({
     return [positions, scales, randoms, speeds];
   }, [count]);
 
+  const colorA = palette[0];
+  const colorB = palette[1];
+
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uMouse: { value: new THREE.Vector2(0, 0) },
-      uColorA: { value: new THREE.Color(palette[0]) },
-      uColorB: { value: new THREE.Color(palette[1]) },
+      uColorA: { value: new THREE.Color(colorA) },
+      uColorB: { value: new THREE.Color(colorB) },
     }),
-    [palette[0], palette[1]]
+    [colorA, colorB]
   );
 
   useFrame(({ clock }) => {

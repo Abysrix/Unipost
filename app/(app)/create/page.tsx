@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { requireUser, displayName } from "@/lib/auth/getUser";
+import { requireUser } from "@/lib/auth/getUser";
+import { getOwnProfile } from "@/lib/db/profiles";
 import { getPost } from "@/lib/db/posts";
 import CreateStudio from "@/components/studio/CreateStudio";
 
@@ -13,8 +14,18 @@ export default async function CreatePage({
 }) {
   const user = await requireUser();
   const id = typeof searchParams.id === "string" ? searchParams.id : undefined;
-  // RLS returns null if the id isn't the caller's — falls back to a new draft.
-  const initial = id ? await getPost(id) : null;
+  
+  // Fetch profile and initial post in parallel
+  const [profile, initial] = await Promise.all([
+    getOwnProfile(),
+    id ? getPost(id) : Promise.resolve(null)
+  ]);
 
-  return <CreateStudio initial={initial} userId={user.id} authorName={displayName(user)} />;
+  return (
+    <CreateStudio
+      initial={initial}
+      userId={user.id}
+      authorName={profile.display_name || user.email?.split("@")[0] || "Creator"}
+    />
+  );
 }
