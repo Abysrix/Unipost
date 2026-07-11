@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import type { Post, PostInput } from "@/types/post";
+import type { ScheduledEvent } from "@/types/schedule";
 
 /**
  * Data layer for `public.posts`. All queries run through the request-scoped
@@ -22,7 +23,7 @@ export async function listDrafts(): Promise<Post[]> {
   const { data, error } = await supabase
     .from("posts")
     .select(COLUMNS)
-    .eq("status", "draft")
+    .neq("status", "archived")
     .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   if (error) throw error;
@@ -64,7 +65,38 @@ export async function updatePost(id: string, patch: Partial<PostInput>): Promise
   const supabase = createClient();
   const { data, error } = await supabase.from("posts").update(patch).eq("id", id).select(COLUMNS).single();
   if (error) throw error;
+  
+  try {
+    await propagatePublishedPostUpdates(id);
+  } catch (e) {
+    console.error("Failed to propagate post updates to live platforms:", e);
+  }
+  
   return data as unknown as Post;
+}
+
+async function propagatePublishedPostUpdates(postId: string): Promise<void> {
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { getPublisher } = await import("@/lib/schedule/publishing");
+  const admin = createAdminClient();
+  
+  // Find all successfully published schedules for this post that have an external ID
+  const { data: schedules, error } = await admin
+    .from("scheduled_posts")
+    .select("id,user_id,post_id,platform,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,published_at,created_at,updated_at,platform_post_id,connected_account_id, post:posts(id,title,content,media)")
+    .eq("post_id", postId)
+    .eq("status", "published")
+    .not("platform_post_id", "is", null);
+    
+  if (error || !schedules || schedules.length === 0) return;
+  
+  for (const row of schedules) {
+    const sp = row as unknown as ScheduledEvent;
+    const publisher = getPublisher(sp.platform);
+    if (sp.platform_post_id) {
+      await publisher.update(sp.platform_post_id, sp);
+    }
+  }
 }
 
 export async function softDeletePost(id: string): Promise<void> {

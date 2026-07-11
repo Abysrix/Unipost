@@ -8,6 +8,7 @@ export default function PostActions({
   isNew,
   saving,
   scheduling = false,
+  isPublished = false,
   onSave,
   onDuplicate,
   onDelete,
@@ -16,6 +17,7 @@ export default function PostActions({
   isNew: boolean;
   saving: boolean;
   scheduling?: boolean;
+  isPublished?: boolean;
   onSave: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -37,18 +39,33 @@ export default function PostActions({
             <Copy size={15} /> Duplicate
           </button>
         )}
-        <button type="button" onClick={onSave} disabled={saving} data-cursor="pointer" className={cn(btn, "border border-white/[0.12] text-white hover:border-white/30 disabled:opacity-60")}>
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save
-        </button>
-        <button
-          type="button"
-          onClick={onSchedule}
-          disabled={!onSchedule || scheduling}
-          data-cursor="pointer"
-          className={cn(btn, "text-black transition-opacity [background:linear-gradient(120deg,#22d3ee,#34d399,#facc15)] hover:opacity-90 disabled:opacity-50")}
-        >
-          {scheduling ? <Loader2 size={15} className="animate-spin" /> : <CalendarClock size={15} />} Schedule
-        </button>
+        
+        {isPublished ? (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            data-cursor="pointer"
+            className={cn(btn, "text-black transition-opacity [background:linear-gradient(120deg,#22d3ee,#34d399,#facc15)] hover:opacity-90 disabled:opacity-50")}
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save edit
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={onSave} disabled={saving} data-cursor="pointer" className={cn(btn, "border border-white/[0.12] text-white hover:border-white/30 disabled:opacity-60")}>
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save
+            </button>
+            <button
+              type="button"
+              onClick={onSchedule}
+              disabled={!onSchedule || scheduling}
+              data-cursor="pointer"
+              className={cn(btn, "text-black transition-opacity [background:linear-gradient(120deg,#22d3ee,#34d399,#facc15)] hover:opacity-90 disabled:opacity-50")}
+            >
+              {scheduling ? <Loader2 size={15} className="animate-spin" /> : <CalendarClock size={15} />} Schedule
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-export type ModelId = "tencent/hy3:free";
+export type ModelId = "tencent/hy3:free" | "nvidia/nemotron-3-super-120b-a12b:free";
 
 export interface AIModel {
   id: ModelId;

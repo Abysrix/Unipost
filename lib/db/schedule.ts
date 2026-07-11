@@ -218,7 +218,12 @@ export async function publishNow(id: string): Promise<{ ok: boolean; error?: str
   const result = await publishScheduledPost(sp);
 
   if (result.ok) {
-    await supabase.from("scheduled_posts").update({ status: "published", published_at: new Date().toISOString(), error: null }).eq("id", id);
+    await supabase.from("scheduled_posts").update({ 
+      status: "published", 
+      published_at: new Date().toISOString(), 
+      platform_post_id: result.externalId ?? null,
+      error: null 
+    }).eq("id", id);
     await log(userId, sp, "published", result.externalId ? `Published (${result.externalId})` : "Published");
     await syncPostStatus(sp.post_id);
     try {

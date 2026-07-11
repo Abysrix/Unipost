@@ -1,12 +1,32 @@
 "use client";
 
-import { CalendarClock, Copy, Trash2, Ban, Zap, Star, RefreshCw, Archive, Loader2, PenSquare } from "lucide-react";
+import { CalendarClock, Copy, Trash2, Ban, Zap, Star, RefreshCw, Archive, Loader2, PenSquare, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import PlatformBadge from "@/components/ui/PlatformBadge";
 import { formatDateTime, relativeTo, zoneAbbr } from "@/lib/schedule/timezone";
 import type { ScheduledEvent } from "@/types/schedule";
 import PublishingStatus from "./PublishingStatus";
+
+function getPlatformPostUrl(platform: string, platformPostId: string): string | null {
+  if (!platformPostId) return null;
+  switch (platform) {
+    case "youtube":
+      return `https://www.youtube.com/watch?v=${platformPostId}`;
+    case "x":
+      return `https://x.com/status/${platformPostId}`;
+    case "linkedin":
+      return `https://www.linkedin.com/feed/update/${platformPostId}`;
+    case "facebook":
+      return `https://www.facebook.com/${platformPostId}`;
+    case "instagram":
+      return `https://www.instagram.com/p/${platformPostId}`;
+    case "threads":
+      return `https://www.threads.net/post/${platformPostId}`;
+    default:
+      return null;
+  }
+}
 
 export interface ScheduledCardHandlers {
   onReschedule?: (event: ScheduledEvent) => void;
@@ -74,6 +94,15 @@ export default function ScheduledPostCard({
             {busy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Publish now
           </button>
         )}
+        {event.status === "published" && event.platform_post_id && (() => {
+          const url = getPlatformPostUrl(event.platform, event.platform_post_id);
+          if (!url) return null;
+          return (
+            <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-aurora-green/25 bg-aurora-green/[0.08] px-2.5 py-1.5 text-[11px] font-medium text-aurora-green transition-colors hover:bg-aurora-green/[0.14]">
+              <ExternalLink size={12} /> View live post
+            </a>
+          );
+        })()}
         <Link href={`/create?id=${event.post_id}`} className="flex items-center gap-1.5 rounded-lg border border-white/[0.1] px-2.5 py-1.5 text-[11px] font-medium text-white/70 transition-colors hover:border-white/25 hover:text-white">
           <PenSquare size={12} /> Edit
         </Link>

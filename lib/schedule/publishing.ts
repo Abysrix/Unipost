@@ -1,6 +1,7 @@
 import type { ScheduledEvent } from "@/types/schedule";
 import { getPlatform, hasCapability } from "@/config/platforms";
 import { MEDIA } from "@/lib/validations/post";
+import { youtubePublisher } from "./publishers/youtube";
 
 /**
  * Publishing Adapter — the abstraction every platform implements identically.
@@ -156,7 +157,9 @@ const stubPublisher: PlatformPublisher = {
 };
 
 /** Registry of platform publishers. Real ones register here in a later sprint. */
-const registry = new Map<string, PlatformPublisher>();
+const registry = new Map<string, PlatformPublisher>([
+  ["youtube", youtubePublisher]
+]);
 
 export function registerPublisher(p: PlatformPublisher): void {
   registry.set(p.platform, p);
@@ -184,3 +187,5 @@ export function validateScheduledPost(sp: ScheduledEvent): ValidationResult {
 export function previewScheduledPost(sp: ScheduledEvent): PublishPreview {
   return getPublisher(sp.platform).preview(sp);
 }
+
+

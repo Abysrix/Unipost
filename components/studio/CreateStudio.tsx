@@ -128,6 +128,7 @@ export default function CreateStudio({
   const validations = validateForPlatforms(content, media, platforms);
   const limit = tightestLimit(platforms);
   const isNew = !id;
+  const isPublished = initial?.status === "published";
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -139,7 +140,7 @@ export default function CreateStudio({
           </Link>
           <div className="flex items-center gap-2">
             <PenSquare size={18} className="text-aurora-teal" />
-            <h1 className="font-display text-xl font-bold text-white">{isNew ? "Create post" : "Edit draft"}</h1>
+            <h1 className="font-display text-xl font-bold text-white">{isPublished ? "Edit post" : isNew ? "Create post" : "Edit draft"}</h1>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -197,19 +198,22 @@ export default function CreateStudio({
               isNew={isNew}
               saving={status === "saving"}
               scheduling={preparingSchedule}
+              isPublished={isPublished}
               onSave={() => { debounced.cancel(); void saveNow(); }}
               onDuplicate={onDuplicate}
               onDelete={onDelete}
-              onSchedule={() => void onSchedule()}
+              onSchedule={isPublished ? undefined : (() => void onSchedule())}
             />
           </div>
         </div>
 
         {/* Sidebar */}
         <aside className="space-y-5">
-          <WidgetContainer title="Publish to">
-            <PlatformSelector selected={platforms} onChange={(p) => { setPlatforms(p); markChanged(); }} />
-          </WidgetContainer>
+          {!isPublished && (
+            <WidgetContainer title="Publish to">
+              <PlatformSelector selected={platforms} onChange={(p) => { setPlatforms(p); markChanged(); }} />
+            </WidgetContainer>
+          )}
 
           <WidgetContainer title="Media">
             <MediaUploader ref={mediaRef} userId={userId} media={media} onChange={(m) => { setMedia(m); markChanged(); }} />

@@ -120,7 +120,24 @@ async function savePermissions(accountId: string, userId: string, platform: Plat
   const requested = providerConfig(platform).scopes;
   const granted = new Set((grantedScope ?? requested.join(" ")).split(/[\s,]+/).filter(Boolean));
   await admin.from("platform_permissions").delete().eq("connected_account_id", accountId);
-  const rows = requested.map((scope) => ({ connected_account_id: accountId, user_id: userId, scope, granted: granted.has(scope) || granted.size === 0 }));
+  
+  const rows = requested.map((scope) => {
+    let isGranted = granted.has(scope) || granted.size === 0;
+    // Google normalizes "profile" and "email" short scopes to full URLs in its token responses
+    if (!isGranted && scope === "profile") {
+      isGranted = granted.has("https://www.googleapis.com/auth/userinfo.profile");
+    }
+    if (!isGranted && scope === "email") {
+      isGranted = granted.has("https://www.googleapis.com/auth/userinfo.email");
+    }
+    return {
+      connected_account_id: accountId,
+      user_id: userId,
+      scope,
+      granted: isGranted,
+    };
+  });
+  
   if (rows.length > 0) await admin.from("platform_permissions").insert(rows);
 }
 
@@ -296,13 +313,13 @@ export async function validateConnection(id: string): Promise<SyncOutcome> {
  * platform, or `null` if the user has no connected, non-disconnected
  * account for it at all.
  */
-export async function getDefaultAccountId(platform: PlatformId): Promise<string | null> {
-  const userId = await uid();
-  const supabase = createClient();
-  const { data } = await supabase
+export async function getDefaultAccountId(platform: PlatformId, userId?: string): Promise<string | null> {
+  const targetUid = userId ?? (await uid());
+  const admin = createAdminClient();
+  const { data } = await admin
     .from("connected_accounts")
     .select("id")
-    .eq("user_id", userId)
+    .eq("user_id", targetUid)
     .eq("platform", platform)
     .neq("status", "disconnected")
     .order("is_default", { ascending: false })
@@ -320,13 +337,14 @@ export async function getDefaultAccountId(platform: PlatformId): Promise<string 
  * token that's about to be rejected.
  */
 export async function getValidAccessToken(accountId: string): Promise<string | null> {
-  const userId = await uid();
   const tokens = await getDecryptedTokens(accountId);
   if (!tokens) return null;
   if (!isTokenNearExpiry(tokens.expiresAt) || !tokens.refreshToken) return tokens.accessToken;
 
   const account = await getConnection(accountId);
   if (!account) return null;
+  const userId = account.user_id;
+  
   const refreshed = await withRetry(() => refreshAccessToken(account.platform, tokens.refreshToken as string));
   await saveTokens(accountId, userId, refreshed);
   await logEvent(userId, account.platform, "token_refreshed", accountId, "Access token silently refreshed");

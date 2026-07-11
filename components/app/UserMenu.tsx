@@ -14,6 +14,7 @@ function initials(name: string): string {
 /** Avatar + dropdown (profile summary, account links, sign out). */
 export default function UserMenu({ user }: { user: AppUser }) {
   const [open, setOpen] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,9 +41,16 @@ export default function UserMenu({ user }: { user: AppUser }) {
         data-cursor="pointer"
         className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-1 pl-1 pr-2 transition-colors hover:border-white/20"
       >
-        {user.avatarUrl ? (
+        {user.avatarUrl && 
+         !imgFailed && 
+         !user.avatarUrl.includes("ACg8ocJ-7cSYSfDRO1VckLEGoQkuSLSunfOH8lm0GFTQnEXdhGqBRg") ? (
           // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied avatar URLs, not a local asset next/image can optimize
-          <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+          <img 
+            src={user.avatarUrl} 
+            alt="" 
+            className="h-7 w-7 rounded-full object-cover" 
+            onError={() => setImgFailed(true)}
+          />
         ) : (
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-aurora-cyan/40 to-aurora-green/40 text-[11px] font-bold text-white">
             {initials(user.name)}

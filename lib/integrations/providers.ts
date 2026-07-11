@@ -116,7 +116,7 @@ export const PROVIDER_CONFIGS: Record<PlatformId, OAuthProviderConfig> = {
     revokeMethod: "google",
     scopes: [
       "https://www.googleapis.com/auth/youtube.readonly",
-      "https://www.googleapis.com/auth/youtube.upload",
+      "https://www.googleapis.com/auth/youtube",
       "openid",
       "profile"
     ],

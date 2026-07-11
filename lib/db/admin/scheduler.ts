@@ -61,7 +61,12 @@ export async function processScheduledQueue(): Promise<{ processed: number; succ
 
       if (result.ok) {
         succeeded++;
-        await admin.from("scheduled_posts").update({ status: "published", published_at: new Date().toISOString(), error: null }).eq("id", sp.id);
+        await admin.from("scheduled_posts").update({ 
+          status: "published", 
+          published_at: new Date().toISOString(), 
+          platform_post_id: result.externalId ?? null,
+          error: null 
+        }).eq("id", sp.id);
         await logPublishing(admin, sp.user_id, sp, "published", result.externalId ? `Published (${result.externalId})` : "Published");
         await syncPostStatusAdmin(admin, sp.post_id);
         
