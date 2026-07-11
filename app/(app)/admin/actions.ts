@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { requireUser } from "@/lib/auth/getUser";
 import { isAdmin, type Role } from "@/lib/auth/role";
 import type { Plan } from "@/lib/auth/role";
+import { getOwnProfile } from "@/lib/db/profiles";
 import * as users from "@/lib/db/admin/users";
 import * as billing from "@/lib/db/admin/billing";
 import * as moderation from "@/lib/db/admin/moderation";
@@ -16,7 +17,8 @@ import type { HealthCheck } from "@/types/admin";
 /** Every admin action re-checks the role server-side — defense in depth beyond the layout gate. */
 async function guardAdmin() {
   const user = await requireUser();
-  if (!isAdmin(user)) redirect("/dashboard");
+  const profile = await getOwnProfile();
+  if (!isAdmin(profile.role)) redirect("/dashboard");
   return user;
 }
 

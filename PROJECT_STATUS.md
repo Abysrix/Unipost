@@ -1,8 +1,8 @@
 # PROJECT_STATUS.md
 ### Living status log — the accurate "current state". Update at the end of every sprint.
 
-## 🚀 RELEASE CANDIDATE 1 (RC1)
-_Last updated: Sprint 10 (Production Hardening & Launch Readiness) — complete; `tsc` clean, `next build` green (32 routes), `next lint` clean (real config, for the first time — 3 pre-existing warnings in the landing page's WebGL particle system, deliberately untouched). Requires Supabase migrations (0001–0009) + Supabase keys + `INTEGRATIONS_SECRET_KEY` to run live. See Sprint 10's log entry below for the full hardening pass, and the Sprint 10 report (delivered in-conversation) for the complete Production Readiness / Security / Performance / Accessibility reviews and Repository Health Score._
+## 🚀 RELEASE CANDIDATE 1 (RC1) → Integration Phase
+_Last updated: Integration Sprint 2 (Social OAuth & Account Connection Platform) — complete; `tsc` clean, `next build` compiles/lints/typechecks clean (see this sprint's log entry for a local build-verification caveat). Requires Supabase migrations (0001–0011) + Supabase keys + `INTEGRATIONS_SECRET_KEY` to run live. See this sprint's log entry below for the OAuth-hardening pass._
 
 ## Legend
 ✅ done · 🟡 partial · 🔴 not started · ⛔ blocked
@@ -18,8 +18,8 @@ Auth is being built **from scratch in Sprint 1.**
 |---|---|---|
 | Landing page | ✅ | Hero (living dashboard + aurora WebGL + GSAP), 8 story sections, Loader, Navbar, Footer. **FINAL — do not redesign.** |
 | Design system | ✅ | `lib/` tokens·motion·gsap·utils·seo, `config/`, 18 hooks, `providers/AppProviders`, ~30 UI/motion/three components. |
-| **Authentication** | ✅* | **Sprint 1 done.** Supabase Auth (email/password + Google OAuth), `/login` + `/signup`, middleware route-protection, OAuth + email-confirm route handlers, session utilities, protected `/dashboard` shell. *Build passes; end-to-end verification needs live Supabase keys (below). |
-| Database schema | 🟡 | **`posts` + `post-media` (Sprint 3); AI tables (Sprint 4); scheduling tables (Sprint 5); growth/analytics tables (Sprint 6); integration tables (Sprint 7); `subscriptions`·`payments`·`invoices`·`ai_credit_history`·`usage_metrics`·`billing_events` (Sprint 8, `0007_billing.sql`).** `profiles`/`handle_new_user` still pending. |
+| **Authentication & Identity** | ✅* | **Sprint 1 done; identity system rebuilt in Integration Sprint 1.** Supabase Auth (email/password + Google OAuth), `/login` + `/signup`, middleware route-protection, OAuth + email-confirm route handlers, session utilities, protected `/dashboard` shell. Role/plan/display-name/avatar/creator-score/XP now live in a real `profiles` table (migration `0010`), not `app_metadata` + an email allow-list — see this sprint's log entry. *Build passes; end-to-end verification needs live Supabase keys (below). |
+| Database schema | ✅ | **`posts` + `post-media` (Sprint 3); AI tables (Sprint 4); scheduling tables (Sprint 5); growth/analytics tables (Sprint 6); integration tables (Sprint 7); billing tables (Sprint 8); admin tables (Sprint 9); `profiles` (Integration Sprint 1, `0010_profiles.sql`).** No more standing "profiles pending" gap. |
 | **App shell / dashboard** | ✅ | **Sprint 2 done.** Collapsible sidebar + mobile drawer, sticky topbar (search/notifications/plan/user menu), role system (creator/admin), dashboard home (9 widgets), reusable dashboard component library, empty/loading/error/404 states, 11 navigable routes. Mock data only — no business logic. |
 | **Creator Studio** | ✅ | **Sprint 3 done.** Post editor (title/content/auto-grow/counters/emoji/hashtag), multi-platform selector, media manager (Supabase Storage), platform preview, per-platform validation, autosave + Ctrl+S + unsaved-changes guard, full draft CRUD (create/edit/duplicate/soft-delete/restore) persisted via RLS. Drafts library at `/posts`. **Sprint 4:** highlight-to-Ask-AI selection menu in the editor. |
 | **AI Studio & Content Engine** | ✅ | **Sprint 4 done.** Gemini service (`lib/ai/*`, REST/SSE, retry, no SDK); streaming chat (`/api/ai/chat`) with persisted conversations + history, rename/pin/delete/search; 10 templates; prompt library (save/favorite/search); generation history (reuse/favorite/delete/search); 13-action prompt engine powering the in-editor Smart Editor. `/ai` shipped. |
@@ -27,9 +27,11 @@ Auth is being built **from scratch in Sprint 1.**
 | **Analytics (Creator Intelligence)** | ✅ | **Sprint 6 done.** Full analytics dashboard — KPIs, growth/engagement/reach trend charts, platform comparison, publishing timeline, activity heatmap, top-performing + recent posts. Follower/reach/engagement numbers are a **deterministic simulation** (`lib/growth/simulate.ts`) seeded per user and correlated to real publish activity — same stopgap pattern as Sprint 5's publishing stub — until a live platform API lands. |
 | **Creator Score / XP / Achievements / Goals** | ✅ | **Sprint 6 done.** 7-factor Creator Score (5 of 7 factors computed from 100% real data: consistency, frequency, platform activity, AI utilization, content quality; engagement + growth use the simulated analytics above) with daily history; XP ledger + levels awarded on real actions (publish, schedule-ahead, AI use, goals, achievements); 10-achievement catalog; user-created Goals (followers/reach/posts/engagement/revenue) with auto-tracked progress. |
 | **AI Growth Coach** | ✅ | **Sprint 6 done.** Rule-based recommendation engine (8 rules: streak risk, timing, format, platform diversity, engagement drop, AI usage, growth win, goal progress) persisted per-kind with dismiss/complete/history. "Ask the coach" deep-links into the **existing** `/ai` conversation system (Sprint 4) rather than a second chat stack. |
-| **Social Integration Platform** | ✅ | **Sprint 7 done.** Config-driven OAuth engine for 6 platforms (Instagram, Facebook, LinkedIn, X, Threads, YouTube) with AES-256-GCM-encrypted token storage, HMAC-signed CSRF state, automatic refresh, capability system, and a full publishing-adapter interface (publish/schedule/update/delete/validate/preview). No real developer-app credentials exist yet, so the connect flow runs through a **simulated consent screen** end-to-end (same stub philosophy as Sprint 5/6) — adding real client id/secret per platform activates real OAuth with zero code changes. `/integrations` shipped. |
+| **Social Integration Platform** | ✅ | **Sprint 7 done; hardened in Integration Sprint 2.** Config-driven OAuth engine for 6 real platforms (Instagram, Facebook, LinkedIn, X, Threads, YouTube) with AES-256-GCM-encrypted token storage, HMAC-signed CSRF state, automatic + silent refresh, capability system, and a full publishing-adapter interface (publish/schedule/update/delete/validate/preview — Sprint 7, untouched this sprint). No real developer-app credentials exist yet, so the connect flow runs through a **simulated consent screen** end-to-end (same stub philosophy as Sprint 5/6) — adding real client id/secret per platform activates real OAuth with zero code changes. Integration Sprint 2 closed a Sprint-9-shaped RLS gap on the 5 integration tables and added multi-account primary/nickname support; the real S256 PKCE flow for X was found already correctly wired going into this sprint (verified, not re-built). `/integrations` shipped. |
 | **Billing, Subscriptions & AI Credits** | ✅ | **Sprint 8 done.** Real `subscriptions` (source of truth) synced to the cheap `app_metadata.plan` cache used app-wide; configuration-driven plan-limits engine (`lib/billing/plans.ts` — never a hardcoded number at a call site); real Razorpay order/verify/webhook integration, **config-gated to an in-app mock checkout** when no `RAZORPAY_KEY_ID`/`SECRET` exist (same stub philosophy as Sprint 5/7); atomic race-safe AI credit ledger (`spend_credits` Postgres function, advisory-locked, ownership-checked) wired as a real hard gate into `runAction`, `/api/ai/chat`, `createSchedules` (plan-capped scheduled posts) and `completeConnection` (plan-capped connected accounts); Analytics history depth now plan-gated. `/billing` shipped; `SubscriptionStatus` dashboard widget now reads real credit data. |
-| **Admin Control Center** | ✅ | **Sprint 9 done.** Full platform-operations console at `/admin/*` (Overview, Users, Billing, AI Usage, Platform Health, Moderation, Audit Log, Settings) gated by a JWT-`app_metadata`-role check, backed entirely by the service-role admin client. User management (search/filter/suspend/reactivate/delete/role-change/plan-override/password-reset/CSV export) over the Auth Admin API (no `profiles` table yet, still). Billing admin (plans/payments/invoices/revenue charts, manual upgrade/downgrade/cancel/renew; refunds are bookkeeping-only, no live Razorpay call). AI monitoring (requests/duration/failure-rate/rough cost estimate) — added `ai_generations.duration_ms` + failure-path audit logging to make this real, not mocked. Platform Health (opt-in manual check, config-presence based, persisted). Content Moderation (flag/unflag/soft-delete/bulk, over new `posts.flagged`/`posts.moderation_note`). Audit Log — new `audit_logs` table + a unified timeline composed from it plus the existing `billing_events`/`integration_events`/`sync_logs`. Feature Flags (`maintenance_mode`, `ai_studio_enabled`, `growth_coach_enabled`, `signups_enabled`) enforced at runtime (`(app)/layout.tsx` gate + read call-sites), plus a read-only Plans/pricing view and a safe env-config **presence** view (never values). Also shipped the previously-missing **password reset flow** (`/forgot-password`, `/reset-password`) as part of the same audit-logging work. |
+| **Admin Control Center** | ✅ | **Sprint 9 done; role check now backed by `profiles` (Integration Sprint 1).** Full platform-operations console at `/admin/*` (Overview, Users, Billing, AI Usage, Platform Health, Moderation, Audit Log, Settings), backed entirely by the service-role admin client. User management (search/filter/suspend/reactivate/delete/role-change/plan-override/password-reset/CSV export) over the Auth Admin API, now batch-joined against `profiles` for role/display-name/creator-score/xp instead of `app_metadata`. Billing admin (plans/payments/invoices/revenue charts, manual upgrade/downgrade/cancel/renew; refunds are bookkeeping-only, no live Razorpay call). AI monitoring (requests/duration/failure-rate/rough cost estimate) — added `ai_generations.duration_ms` + failure-path audit logging to make this real, not mocked. Platform Health (opt-in manual check, config-presence based, persisted). Content Moderation (flag/unflag/soft-delete/bulk, over new `posts.flagged`/`posts.moderation_note`). Audit Log — new `audit_logs` table + a unified timeline composed from it plus the existing `billing_events`/`integration_events`/`sync_logs`. Feature Flags (`maintenance_mode`, `ai_studio_enabled`, `growth_coach_enabled`, `signups_enabled`) enforced at runtime (`(app)/layout.tsx` gate + read call-sites), plus a read-only Plans/pricing view and a safe env-config **presence** view (never values). Also shipped the previously-missing **password reset flow** (`/forgot-password`, `/reset-password`) as part of the same audit-logging work. |
+| **Identity, RBAC & Real Profiles** | ✅ | **Integration Sprint 1 done.** Real `profiles` table (migration `0010`) replaces `app_metadata` + an `ADMIN_EMAILS` env allow-list as the source of truth for role/plan/display name/avatar/bio/timezone/username/creator score/XP. Column-lockdown trigger stops a user's own session from ever writing the privileged columns (role/plan/score/xp) — a blanket own-row write policy would let a user grant themselves admin by writing their own `role` column directly, the same mistake Sprint 8's original billing migration made. Role now checked at the edge (middleware, scoped to `/admin/*` only), the admin layout, and every admin Server Action — three layers, not one. Dashboard's Creator Score widget and every identity display (name/avatar/plan) read real data; a real `/settings` profile-edit page replaces its `ComingSoonCard`. See this sprint's log entry for the full design rationale. |
+| **OAuth Hardening & Multi-Account Support** | ✅ | **Integration Sprint 2 done.** Closed the same "blanket own-row write policy" RLS gap Sprint 9's `0009_security_hardening.sql` found on billing — migration `0011` locks `connected_accounts`/`oauth_tokens`/`platform_permissions`/`sync_logs`/`integration_events` to read-only for `authenticated`; `lib/db/integrations.ts` moved to the service-role client, same pattern as `lib/db/billing.ts` (two write paths — `deleteConnection`/`renameConnection` — needed an explicit `user_id` filter added during the conversion, since the service-role client no longer gets that from RLS for free). Real S256 PKCE for X/Twitter was found **already correctly implemented** going into this sprint — verified via direct code inspection rather than assumed from memory, then cleaned up one vestigial artifact: the static provider config still carried a fake `code_challenge: "challenge"` placeholder that `buildAuthorizeUrl` was already silently overriding whenever a real verifier was supplied; removed it and added a declarative `pkce: true` config field so `requiresPkce()` reads config instead of hardcoding a platform check. Real provider-side revoke for Instagram/Facebook/Threads (Meta Graph API `DELETE .../me/permissions`) alongside the pre-existing Google one, via a new `revokeMethod: "meta" | "google"` discriminator — 2 of 6 platforms previously had no working revoke at all; LinkedIn/X's revoke shapes need client credentials in the request body (a third, different shape) and are left as a documented no-op rather than guessed at. Multi-account primary/nickname (`is_default`, `nickname` columns; at most one default per user+platform via a partial unique index). Avatar images (`profile_image`) were stored since Sprint 7 but never rendered anywhere — now shown in both the platform grid and connection detail. TikTok/Pinterest gained real-endpoint provider-config stubs (`FUTURE_PROVIDER_CONFIGS`) without widening `PlatformId` (exhaustively matched across scheduling/composer/analytics — out of this sprint's "only establish connections" scope). See this sprint's log entry for the full design rationale. |
 
 ## Environment
 - `.next` is junctioned to `%TEMP%\unipost-next` (OneDrive corrupts in-place `.next`).
@@ -37,6 +39,214 @@ Auth is being built **from scratch in Sprint 1.**
 - **Secrets:** `.env.local` (gitignored). User provides Supabase keys. See `.env.example`.
 
 ## Sprint log
+- **Integration Sprint 2 — Social OAuth & Account Connection Platform ✅:**
+  Audited Sprint 7's existing integration system in full before writing
+  anything (per this sprint's own "reuse everything possible" instruction),
+  and — importantly — verified every claim by reading the actual current
+  code rather than trusting memory of what a "typical Sprint 7 baseline"
+  should contain (a lesson from earlier this Integration Phase: this
+  project's disk state had been reverted by an external tool mid-session, to
+  a checkpoint that turned out to be *not* a clean single-point-in-time
+  snapshot — real S256 PKCE for X was already correctly wired, something
+  that would only be true if the checkpoint captured some later work too).
+  Confirmed present: a config-driven `OAuthProviderConfig` registry
+  (`lib/integrations/providers.ts`) + a generic OAuth 2.0 engine
+  (`lib/integrations/oauth.ts`) that never branches per platform, normalized
+  `ProviderProfile`/`ProviderTokens` interfaces every platform returns,
+  AES-256-GCM token encryption + HMAC-signed CSRF state
+  (`lib/integrations/crypto.ts`), and an already-working stub/real dual-mode
+  (`hasRealCredentials()`) that makes "add credentials, zero code changes"
+  literally true. This sprint's brief asked for a `SocialProvider` interface
+  with connect/disconnect/refreshToken/validateToken/getProfile — the
+  existing architecture already satisfies all of that
+  (`buildAuthorizeUrl`+`exchangeCode` / `disconnectAccount` /
+  `refreshAccessToken` / `validateConnection` / `fetchProfile`) via
+  composition rather than a class per platform; rewriting it into literal
+  `InstagramProvider`/`FacebookProvider`/etc. classes would have
+  **duplicated** the generic engine six times over — exactly what "never
+  duplicate logic" rules out. Real new work instead:
+  **Security (the critical finding, same shape as Sprint 9's on billing):**
+  migration `0006` gave `connected_accounts`/`oauth_tokens`/
+  `platform_permissions`/`sync_logs`/`integration_events` the identical
+  blanket own-row INSERT/UPDATE/DELETE policy that made the billing tables
+  exploitable. `oauth_tokens` is what actually matters: a user could
+  insert/update their own row directly (though not forge a *working* token —
+  the encryption key never reaches the client), and could fabricate
+  `connected_accounts` rows to route around `completeConnection`'s
+  plan-based connection-limit check, which is application logic, not
+  something the old RLS enforced on its own. Fixed with the exact Sprint 9
+  pattern: moved every write in `lib/db/integrations.ts`
+  (`completeConnection`, `disconnectAccount`, `syncAccount`, `saveTokens`,
+  `savePermissions`, the new `setDefaultAccount`/`renameConnection`) to the
+  service-role client — still gated by `uid()`/explicit `user_id` filters in
+  application code — then dropped the now-unnecessary `authenticated`-role
+  write policies in new migration `0011_integrations_hardening.sql`.
+  **Caught during the conversion, not after:** `deleteConnection` and the
+  new `renameConnection` previously had no explicit `user_id` filter of
+  their own — they relied entirely on RLS's `auth.uid() = user_id` policy to
+  stop a user from touching another user's row by guessing an id. Moving
+  them to the service-role client (which bypasses RLS) would have silently
+  turned that into a real cross-user vulnerability if the `.eq("user_id",
+  userId)` filter weren't added explicitly at the same time — added to both.
+  Read access unchanged.
+  **PKCE — verified already correct, then cleaned up:** `lib/integrations/
+  crypto.ts::generateCodeVerifier`, `oauth.ts::requiresPkce`/
+  `buildAuthorizeUrl` (real S256 challenge from a genuine per-request
+  verifier), and both OAuth routes threading a verifier end-to-end were all
+  already present and correct on disk. The one real issue: X's static
+  provider config still carried a hardcoded fake
+  `code_challenge: "challenge", code_challenge_method: "plain"` — vestigial,
+  since `buildAuthorizeUrl` already deleted and overrode it whenever a real
+  verifier was supplied, but confusing to read and a landmine for anyone who
+  removed the override logic later. Removed it and added a declarative
+  `pkce?: boolean` field to `OAuthProviderConfig`, so `requiresPkce()` reads
+  config instead of a hardcoded `platform === "x"` check — matches this
+  file's own stated principle ("adding a 7th platform is one config object,
+  never a hardcoded conditional").
+  **Revocation, made real for 2 more platforms:** the generic
+  `revokeAccessToken()` assumed one request shape (`POST {url}?token=...`,
+  matching Google's real API) for every provider — before this sprint, only
+  YouTube actually had a `revokeUrl` configured; Instagram/Facebook/LinkedIn/
+  X/Threads silently no-op'd (safe, since disconnecting still deletes
+  UniPost's own copy of the token immediately regardless — but not the same
+  as the provider itself also revoking access). Meta's Graph API
+  (Instagram/Facebook/Threads — same platform family, same shape) uses
+  `DELETE .../me/permissions?access_token=...` instead, no separate
+  credentials needed since the token self-authenticates the call — added a
+  `revokeMethod: "meta" | "google"` discriminator and implemented both
+  shapes correctly. LinkedIn/X's revoke endpoints need client credentials in
+  a form body (a third, different shape) — left as the existing safe no-op
+  rather than guess at a shape without a real app to verify it against;
+  documented as a scoped decision, not an oversight.
+  **Account management (Phase 4):** `connected_accounts` gained `nickname`
+  (cosmetic local label, never sent to the provider) and `is_default`
+  (which account a platform's actions use by default when more than one is
+  connected), the latter enforced to at most one per (user, platform) by a
+  partial unique index, not application code alone. The first account
+  connected to a platform is auto-marked default; disconnecting a default
+  account promotes the next-oldest surviving one automatically. Multiple
+  accounts per platform were already supported at the schema level since
+  Sprint 7 (`unique(user_id, platform, account_id)`) — this sprint added the
+  "which one is primary" concept on top. New `setDefaultAction`/
+  `renameAction` server actions; `ConnectionCard` gained inline nickname
+  editing + a "Set as default" control, `AccountSelector` shows nicknames
+  and a default star.
+  **Dashboard (Phase 7):** `profile_image` has been fetched and stored since
+  Sprint 7 but was never actually rendered anywhere — both `PlatformCard`
+  (platform grid) and `ConnectionCard` (detail view) showed only the
+  platform's own brand glyph, never the connected account's real avatar. Now
+  shown, with the glyph as fallback when no image exists. `PlatformCard`'s
+  "primary" account for a platform now prefers the one flagged `is_default`
+  instead of just whichever connection happened to be created first.
+  **Future platforms:** TikTok and Pinterest already had `FUTURE_PLATFORMS`
+  UI entries (Sprint 7) but no provider config. Added
+  `FUTURE_PROVIDER_CONFIGS` — same shape as the real `OAuthProviderConfig`,
+  real documented endpoints (TikTok Login Kit, Pinterest API v5) —
+  deliberately kept **out** of `PROVIDER_CONFIGS`/`PlatformId` rather than
+  widening that union: `PlatformId` is exhaustively matched across
+  scheduling, the composer, and analytics, and neither platform is actually
+  connectable yet, so widening it would ripple into three subsystems this
+  sprint explicitly doesn't touch, for zero functional gain until a future
+  sprint actually wires up scheduling/composing for them.
+  `tsc` clean. `next build`'s compile + lint + type-check phase succeeded
+  cleanly on **every attempt** this sprint (2/2). **Live/preview
+  verification was blocked again by the same local environment fault
+  flagged in last sprint's log entry** — `next build`'s later "Collecting
+  page data" phase and the dev server both hit `Cannot find module` errors
+  for core Next.js/React files (confirmed via a rendered error overlay this
+  time, not just logs) that demonstrably exist on disk. This is a
+  **recurrence**, not a new issue: `.next` had reverted to a plain in-place
+  folder again (the junction workaround was re-applied, same as last
+  sprint), and the deeper module-resolution fault persisted regardless.
+  What *was* confirmed, from server logs even under the broken render
+  state: an unauthenticated request to `/integrations` correctly produced
+  `GET /login?redirect=%2Fintegrations`, proving the routing/middleware
+  logic itself (untouched this sprint) is correct — only the page-render
+  step is affected by the environment fault. See the known-risks list for
+  the still-unresolved recommended fix.
+  **⚠ Needs migration `0011_integrations_hardening.sql`.**
+- **Integration Sprint 1 — Identity, RBAC & Real User Profiles ✅:** New migration
+  `0010_profiles.sql` — `profiles` table (id/email/display_name/username/avatar_url/
+  bio/timezone/role/plan/creator_score/xp/subscription_status), replacing
+  `app_metadata` + the `ADMIN_EMAILS` env allow-list as the source of truth for
+  role and plan (a gap tracked since Sprint 1). **Security design (applying Sprint
+  8's billing-RLS lesson from day one, not as a follow-up fix):** a blanket own-row
+  RLS update policy would let a user grant themselves admin by writing their own
+  `role` column directly. Instead of a "no write policy at all, service role only"
+  pattern (which would force the genuinely-safe self-editable fields — display
+  name, username, avatar, bio, timezone — through a second API surface too), this
+  uses a `BEFORE UPDATE` trigger that snaps the privileged columns
+  (`role`/`plan`/`creator_score`/`xp`/`subscription_status`/`id`/`email`) back to
+  their previous value whenever the write comes from a normal `authenticated`
+  session (`auth.role() = 'authenticated'`) — service-role writes pass through
+  untouched. One simple `.update()` from the client works for the safe fields and
+  is a silent no-op for the privileged ones, instead of either blocking both or
+  allowing both. `on_auth_user_created` trigger (`security definer`, fires `after
+  insert on auth.users`) auto-creates a profile for every signup — email,
+  Google OAuth, any future method — so there's no app-code path that can forget
+  to create one; a one-time backfill seeds profiles for every pre-existing user
+  from their current JWT claims (so no already-promoted admin gets demoted, no
+  paying user gets reset to free). `private.is_admin()` (Sprint 9) repointed from
+  reading the JWT's `app_metadata.role` claim to querying `profiles` directly —
+  the JWT-claim version could stay valid for a demoted admin until their token
+  next refreshed; the table read is correct on the very next request.
+  **Application layer:** `lib/auth/role.ts` lost `getRole(user)`/`getPlan(user)`
+  entirely — role/plan/name/avatar/score/xp all come from one `lib/db/
+  profiles.ts::getOwnProfile()` call now (React `cache()`-wrapped, same pattern as
+  the pre-existing `getCurrentUser`, so the root layout + a nested admin layout +
+  the page itself share one query instead of firing three). `isAdmin`/`hasRole`
+  are now pure sync predicates over an already-resolved `Role`, not functions that
+  read a Supabase `User` object. Every call site updated: `(app)/layout.tsx`,
+  `(app)/admin/layout.tsx`, `(app)/admin/actions.ts::guardAdmin()`,
+  `(app)/dashboard/page.tsx`. `lib/db/admin/users.ts`'s `listUsers`/`getUserDetail`
+  now batch-join `profiles` (one query per page, same philosophy as the existing
+  `subscriptions`/`ai_credit_history`/`connected_accounts` joins) instead of
+  calling `getRole`/`getPlan` in a loop — and no longer need a separate
+  `creator_scores`/`xp_history` query at all, since `profiles.creator_score`/`.xp`
+  are kept in sync. `changeUserRole` now writes `profiles.role` via a new
+  `setRole()` instead of the Admin Auth API's `app_metadata`; `syncPlanMetadata`
+  (the `app_metadata.plan` writer) is gone — `setPlan()` replaces every call site
+  (`confirmPayment`, `adminConfirmPayment`, `applyPeriodRollover`, `adminSetPlan`,
+  `overrideUserPlan`).
+  **Middleware gained a third defense layer:** previously only page-level
+  (middleware: authenticated or not; layout: role check). `updateSession()` now
+  also returns the request-scoped Supabase client itself, so middleware can run
+  one extra `profiles.role` query scoped to just `/admin/*` paths (every other
+  request skips it) and redirect a creator to `/dashboard` at the edge, before
+  any admin page or data ever renders — not just at the layout.
+  **Dashboard:** `CreatorScorePreview` read a hardcoded mock summary despite
+  Sprint 6's real Creator Score system existing since — now takes real `score`/
+  `level`/`progress` props from `syncGrowth()`'s bundle (already fetched on that
+  page, just not threaded through). `syncGrowth()` gained a best-effort
+  `syncScoreAndXp()` call so `profiles.creator_score`/`.xp` stay fresh for other
+  readers (admin table, future sidebar use) without the dashboard itself
+  depending on the cache — it reads the live `bundle` values directly, which are
+  fresher. `AppUser` gained `username`/`creatorScore`/`xp`. `avatarUrl` had
+  existed on `AppUser` conceptually but was never wired to a real avatar image —
+  wired it into `UserMenu`'s account button (falls back to initials), with an
+  explicit `aria-label` on the button itself so it isn't accessible-name-less the
+  moment an avatar image is present.
+  **`/settings`** replaced its `ComingSoonCard` (blocked on `profiles` not
+  existing, per its own placeholder copy) with a real profile-edit form —
+  display name, username, avatar URL, bio, timezone (the full canonical IANA
+  list via `Intl.supportedValuesOf`, not a hand-maintained one). Noticed the
+  exact same `Field`/`SubmitButton` form markup had already been independently
+  duplicated twice (`AuthForm.tsx`, `ResetPasswordForm.tsx`) before this made a
+  third copy — extracted `components/ui/FormField.tsx` and refactored both
+  existing forms onto it instead, net negative diff.
+  **First-admin bootstrap:** deliberately no code-level or env-var backdoor (the
+  brief's explicit "never hardcode an admin email" rule) — promote one directly
+  via the Supabase SQL editor
+  (`update public.profiles set role = 'admin' where email = '...'`); every admin
+  after that is created through the admin panel itself.
+  `tsc` clean, `next build` green (32 routes; `/settings` 2.54 kB, up from a
+  184 B placeholder). Live verification limited to the unauthenticated boundary
+  (no live Supabase session available in this sandbox): confirmed `/dashboard`,
+  `/admin`, and `/settings` all correctly redirect to `/login`, no console/server
+  errors. The full register→profile-created→dashboard-real-data→role-enforcement→
+  logout chain the brief's success metric describes is architecturally complete
+  but **unverified end-to-end live** — flagged as the top follow-up.
+  **⚠ Needs migration `0010_profiles.sql`.**
 - **Sprint 10 — Production Hardening & Launch Readiness ✅ (RC1):** No new features —
   audit + harden. **Security (the critical findings):** discovered migration `0007`
   gave `subscriptions`/`payments`/`invoices`/`ai_credit_history`/`usage_metrics`/
@@ -374,8 +584,48 @@ Auth is being built **from scratch in Sprint 1.**
     an RLS policy lockdown (see Sprint 10's log entry). Safe to run any time after `0007`; nothing
     breaks if you run it late, since the app code it depends on (service-role writes in
     `lib/db/billing.ts`) shipped in the same sprint as the migration.
+13. **Identity & RBAC:** run migration `0010_profiles.sql` — no new env vars. To reach `/admin`, a
+    user's `profiles.role` must be `"admin"` — there is **no** email allow-list or env var for this
+    anymore. Promote the first admin directly in the Supabase SQL editor:
+    `update public.profiles set role = 'admin' where email = 'you@example.com';`. Every admin after
+    that can be created through the admin panel itself (Users → role change). Without this
+    migration, every authenticated page errors (the app layout calls `getOwnProfile()`
+    unconditionally) — unlike most prior migrations, this one does not fail soft.
+14. **Social OAuth hardening:** run migration `0011_integrations_hardening.sql` — no new env vars,
+    additive-only (new `nickname`/`is_default` columns + an RLS write-policy lockdown; nothing
+    reads those two columns as `not null`-without-a-default, so existing rows don't need
+    backfilling). Real per-platform OAuth apps remain fully optional (see setup step 9) — TikTok/
+    Pinterest have provider *config* stubs (`lib/integrations/providers.ts::
+    FUTURE_PROVIDER_CONFIGS`) but no connect UI yet, so `TIKTOK_CLIENT_ID`/`PINTEREST_CLIENT_ID`-
+    shaped env vars in `.env.example` don't do anything yet even if set.
 
 ## Known risks / follow-ups
+- **⚠ Recurring local build/dev-server fault — second occurrence, still unresolved.** `next build`'s
+  "Collecting page data" phase and `next dev` both intermittently fail with `Cannot find module`
+  for core Next.js/React files (`react/jsx-runtime`, `next/dist/compiled/next-server/*`) that
+  demonstrably exist on disk — confirmed this sprint via a rendered browser error overlay, not just
+  logs. `tsc --noEmit` and `next build`'s compile+lint+typecheck phase are unaffected and have
+  succeeded on every attempt across both sprints this has occurred in. Also confirmed again this
+  sprint: `.next` had silently reverted from the documented junction (`%TEMP%\unipost-next`) back to
+  a plain in-place folder — re-applying the junction is necessary but **not sufficient**; the deeper
+  fault persists after re-applying it. Suspected cause: OneDrive actively syncing/locking files
+  inside `node_modules` (which — unlike `.next` — has never been relocated outside the synced
+  folder) during the build/dev-server's parallel worker phase. **Recommended fix, still not
+  attempted:** pause OneDrive sync entirely during development, or relocate `node_modules` outside
+  `C:\Users\...\OneDrive\...` the same way `.next` already is (e.g. a junction, or an npm/pnpm
+  config that installs elsewhere), or at minimum confirm whether a `rd /s /q node_modules && npm
+  install` produces a tree OneDrive stops interfering with. Until one of these is tried, expect
+  every sprint's live-preview verification to be unreliable regardless of code correctness.
+- **⚠ This project's `Unipost/.env.local` and `.claude/launch.json` (at the parent working-
+  directory root) did not exist at the start of this sprint** — a separate tool ("antigravity")
+  had reverted the whole project folder to its end-of-Sprint-10 state sometime before this sprint
+  began, which took `.env.local` and every Integration Sprint 1–4 file with it (the Integration
+  Phase's prior 4 sprints are being redone from this point). Recreated `.env.local` with
+  placeholder (non-real) Supabase values so the dev server can boot and middleware routing can be
+  verified — replace with real project credentials before testing anything auth-dependent live.
+  Recreated `.claude/launch.json` at `C:\Users\prade\OneDrive\Desktop\Claude Code\.claude\
+  launch.json` (the preview tooling's actual root — one level above this repo) using
+  `npm --prefix Unipost run dev` so it resolves into this project correctly.
 - **No real Razorpay account configured yet (Sprint 8).** Checkout runs through the in-app mock
   modal until `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set — same posture as Sprint 7's OAuth.
   The webhook route (`/api/webhooks/razorpay`) is real, verified code that nothing calls yet in stub

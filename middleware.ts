@@ -15,7 +15,7 @@ const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/re
 const AUTH_ROUTES = ["/login", "/signup"];
 
 export async function middleware(request: NextRequest) {
-  const { response, user } = await updateSession(request);
+  const { response, user, supabase } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
   const isApiRoute = pathname.startsWith("/api/");
@@ -34,6 +34,20 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // Edge-level role gate for /admin/* (Integration Sprint 1) — one extra
+  // `profiles.role` query, scoped to just this path prefix so every other
+  // request skips it. Defense in depth alongside the admin layout's own
+  // check and each Server Action's `guardAdmin()` — a creator is redirected
+  // before any admin page or data ever renders, not just at the layout.
+  if (user && pathname.startsWith("/admin")) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if ((profile as { role?: string } | null)?.role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

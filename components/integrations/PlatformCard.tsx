@@ -21,15 +21,23 @@ type Props =
 /** One platform tile in the integrations hub — connect, connected, or coming-soon. */
 export default function PlatformCard(props: Props) {
   const { platform } = props;
-  const primary = props.comingSoon ? undefined : props.accounts[0];
+  // The default account represents this platform's tile when there's more
+  // than one — falls back to whichever was returned first (e.g. mid-migration
+  // before any account has been explicitly marked default).
+  const primary = props.comingSoon ? undefined : props.accounts.find((a) => a.is_default) ?? props.accounts[0];
   const accountCount = props.comingSoon ? 0 : props.accounts.length;
 
   return (
     <div className="flex flex-col rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 transition-colors hover:border-white/[0.14]">
       <div className="mb-4 flex items-center justify-between">
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl text-base font-bold" style={{ background: `${platform.color}22`, color: platform.color }}>
-          {platform.glyph}
-        </span>
+        {primary?.profile_image ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external/provider-supplied avatar URL, not a local asset next/image can optimize
+          <img src={primary.profile_image} alt="" className="h-11 w-11 rounded-xl object-cover" />
+        ) : (
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl text-base font-bold" style={{ background: `${platform.color}22`, color: platform.color }}>
+            {platform.glyph}
+          </span>
+        )}
         {primary && <ConnectionStatus status={primary.status} />}
         {props.comingSoon && (
           <span className="flex items-center gap-1 rounded-full bg-white/[0.05] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/40">

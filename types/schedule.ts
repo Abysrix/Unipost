@@ -13,6 +13,8 @@ export interface ScheduledPost {
   user_id: string;
   post_id: string;
   platform: PlatformId;
+  /** Which of the user's (possibly several) connected accounts for this platform to publish through. Null if none was connected at schedule time — resolved again at publish time before failing. */
+  connected_account_id: string | null;
   /** Absolute instant (UTC ISO). */
   scheduled_time: string;
   /** IANA zone the user picked when scheduling (display metadata). */
@@ -24,6 +26,8 @@ export interface ScheduledPost {
   retry_count: number;
   max_retries: number;
   error: string | null;
+  /** The real provider-returned post/media id once published (Integration Sprint 3). Null until a publish attempt succeeds. */
+  platform_post_id: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
@@ -50,6 +54,8 @@ export interface PublishingLog {
   platform: PlatformId;
   status: string;
   message: string | null;
+  /** Structured detail — a real API's response summary, error code, etc. (Integration Sprint 3). Empty object for older log rows. */
+  metadata: Record<string, unknown>;
   created_at: string;
 }
 

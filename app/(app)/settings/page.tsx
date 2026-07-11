@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import { Settings } from "lucide-react";
+import { requireUser } from "@/lib/auth/getUser";
+import { getOwnProfile } from "@/lib/db/profiles";
 import PageHeader from "@/components/dashboard/PageHeader";
-import ComingSoonCard from "@/components/dashboard/ComingSoonCard";
+import ProfileSettingsForm from "@/components/settings/ProfileSettingsForm";
 
 export const metadata: Metadata = { title: "Settings · UniPost" };
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  await requireUser();
+  const profile = await getOwnProfile();
+
   return (
     <div className="mx-auto max-w-[1400px]">
       <PageHeader title="Settings" description="Profile and workspace preferences." icon={Settings} />
-      <ComingSoonCard
-        icon={Settings}
-        eta="Later sprint"
-        title="Profile settings are coming"
-        description="Manage your profile and workspace preferences here. Looking to connect Instagram, YouTube, LinkedIn or X? Head to Integrations in the sidebar — that's live now."
-      />
+      <ProfileSettingsForm profile={profile} />
     </div>
   );
 }

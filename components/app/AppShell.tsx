@@ -9,9 +9,12 @@ import Topbar from "./Topbar";
 export type AppUser = {
   name: string;
   email: string;
+  username?: string | null;
   avatarUrl?: string | null;
   role: Role;
   plan: Plan;
+  creatorScore?: number;
+  xp?: number;
 };
 
 type ShellCtx = {

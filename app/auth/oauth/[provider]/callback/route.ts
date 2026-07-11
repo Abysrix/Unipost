@@ -4,6 +4,7 @@ import { platforms, type PlatformId } from "@/config/platforms";
 import { verifyState } from "@/lib/integrations/crypto";
 import { exchangeCode } from "@/lib/integrations/oauth";
 import { completeConnection } from "@/lib/db/integrations";
+import { seedAnalyticsForPlatform } from "@/lib/db/growth";
 import { isSafeRedirect } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -38,8 +39,9 @@ export async function GET(request: Request, { params }: { params: { provider: st
 
   try {
     const redirectUri = `${origin}/auth/oauth/${platform}/callback`;
-    const { tokens, profile } = await exchangeCode(platform, code, redirectUri, `${user.id}:${platform}`);
+    const { tokens, profile } = await exchangeCode(platform, code, redirectUri, `${user.id}:${platform}`, state.codeVerifier);
     await completeConnection(platform, profile, tokens);
+    await seedAnalyticsForPlatform(platform).catch(() => {});
   } catch (e) {
     const message = e instanceof Error ? e.message : "connect_failed";
     return NextResponse.redirect(`${origin}/integrations?error=${encodeURIComponent(message)}&platform=${platform}`);

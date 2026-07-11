@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { requireUser, displayName } from "@/lib/auth/getUser";
-import { getPlan } from "@/lib/auth/role";
+import { requireUser } from "@/lib/auth/getUser";
+import { getOwnProfile } from "@/lib/db/profiles";
 import { getCreditBalance } from "@/lib/db/billing";
 import { monthlyAllotment } from "@/lib/billing/credits";
 import { listConnections } from "@/lib/db/integrations";
@@ -19,14 +19,15 @@ import SubscriptionStatus from "@/components/dashboard/widgets/SubscriptionStatu
 export const metadata: Metadata = { title: "Dashboard · UniPost" };
 
 export default async function DashboardPage() {
-  const user = await requireUser();
-  const name = displayName(user);
-  const plan = getPlan(user);
-  const creditsRemaining = await getCreditBalance().catch(() => 0);
-  const [connections, bundle] = await Promise.all([
+  await requireUser();
+  const [profile, creditsRemaining, connections, bundle] = await Promise.all([
+    getOwnProfile(),
+    getCreditBalance().catch(() => 0),
     listConnections(),
     syncGrowth(),
   ]);
+  const name = profile.display_name || profile.email.split("@")[0];
+  const plan = profile.plan;
 
   const hasNoConnections = connections.length === 0;
 
@@ -57,7 +58,7 @@ export default async function DashboardPage() {
           <RecentActivity />
         </div>
         <div className="space-y-5">
-          <CreatorScorePreview />
+          <CreatorScorePreview score={bundle.score.score} level={bundle.level.level} progress={bundle.level.progress} />
           <AITipCard />
           <SubscriptionStatus plan={plan} creditsRemaining={creditsRemaining} creditsTotal={monthlyAllotment(plan)} />
         </div>

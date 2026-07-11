@@ -17,11 +17,3 @@ export function createAdminClient() {
   if (!url || !key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured.");
   return createSupabaseClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
-
-/** Sync the cheap, synchronously-read plan cache (`app_metadata.plan`) after a real plan change. */
-export async function syncPlanMetadata(userId: string, plan: "free" | "pro" | "agency"): Promise<void> {
-  const admin = createAdminClient();
-  const { data: existing } = await admin.auth.admin.getUserById(userId);
-  const appMeta = (existing.user?.app_metadata as Record<string, unknown> | undefined) ?? {};
-  await admin.auth.admin.updateUserById(userId, { app_metadata: { ...appMeta, plan } });
-}

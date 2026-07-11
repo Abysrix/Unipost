@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/getUser";
+import { syncScoreAndXp } from "@/lib/db/profiles";
 import type { PlatformId } from "@/config/platforms";
 import type { ScheduledEvent } from "@/types/schedule";
 import { listAllPosts } from "@/lib/db/posts";
@@ -300,6 +301,9 @@ export async function syncGrowth(): Promise<GrowthBundle> {
     listRecommendations(),
     newlyUnlocked.length > 0 ? listUnlockedAchievements() : Promise.resolve(unlockedAchievements),
   ]);
+
+  const user = await getCurrentUser();
+  if (user) await syncScoreAndXp(user.id, score.score, totalXp);
 
   return {
     stats,

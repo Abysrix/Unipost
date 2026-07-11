@@ -11,6 +11,10 @@ export interface ConnectedAccount {
   display_name: string;
   username: string | null;
   profile_image: string | null;
+  /** Cosmetic local label — never sent to the provider. */
+  nickname: string | null;
+  /** Which account a platform's actions use by default when more than one is connected. At most one per (user, platform). */
+  is_default: boolean;
   status: ConnectionStatus;
   last_sync_at: string | null;
   last_error: string | null;

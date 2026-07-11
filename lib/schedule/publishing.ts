@@ -1,23 +1,87 @@
 import type { ScheduledEvent } from "@/types/schedule";
 import { getPlatform, hasCapability } from "@/config/platforms";
+import { MEDIA } from "@/lib/validations/post";
 
 /**
  * Publishing Adapter — the abstraction every platform implements identically.
  *
- * This is the seam where real platform APIs plug in (Meta Graph, YouTube Data,
- * LinkedIn, X, etc.). Each platform becomes one `PlatformPublisher`, registered
- * once via `registerPublisher`. No platform-specific branching happens anywhere
- * else in the codebase — callers only ever talk to this interface. For now the
- * engine is fully wired end-to-end against a deterministic stub, so scheduling,
- * queues, status transitions, retries, validation and previews all behave like
- * production before a single real API call exists.
+ * This is the seam where real platform APIs plug in (Meta Graph, LinkedIn, X,
+ * etc. — see `lib/schedule/providers/*`, Integration Sprint 3). Each platform
+ * becomes one `PlatformPublisher`, registered once via `registerPublisher`.
+ * No platform-specific branching happens anywhere else in the codebase —
+ * callers only ever talk to this interface. Platforms without a registered
+ * real adapter (or a connection that's still in mock/stub mode from
+ * Integration Sprint 2's simulated OAuth) fall back to the original
+ * deterministic stub, so scheduling, queues, status transitions, retries,
+ * validation and previews all still behave like production either way.
  */
+
+/** A stable taxonomy every provider maps its own error shapes onto — lets the UI and retry engine react consistently regardless of which platform failed. */
+export type PublishErrorCode =
+  | "no_connection"
+  | "expired_token"
+  | "permission_denied"
+  | "media_too_large"
+  | "invalid_media_type"
+  | "invalid_caption"
+  | "rate_limited"
+  | "network_error"
+  | "api_error";
+
+/** Errors in this set describe a state a blind retry can't fix — surfaced separately so the retry engine doesn't keep re-attempting a doomed publish. */
+export const NON_RETRYABLE_ERRORS: ReadonlySet<PublishErrorCode> = new Set([
+  "no_connection", "expired_token", "permission_denied", "media_too_large", "invalid_media_type", "invalid_caption",
+]);
 
 export interface PublishResult {
   ok: boolean;
   /** Provider post id / permalink when ok. */
   externalId?: string;
   error?: string;
+  errorCode?: PublishErrorCode;
+  /** Raw API response summary for the activity log — never shown to the user directly (may contain internal provider structure). */
+  responseMeta?: Record<string, unknown>;
+}
+
+/**
+ * Maps an HTTP status (+ optionally the parsed error body) from any of the
+ * providers onto the shared taxonomy above. Status codes are reasonably
+ * standardized across Meta/LinkedIn/X's REST APIs for the auth/permission/
+ * rate-limit cases; anything a provider recognizes more specifically (e.g. a
+ * platform-specific "video too long" code) should override this with its own
+ * classification — this is the sane default, not the only source of truth.
+ */
+export function classifyHttpError(status: number, bodyText?: string): PublishErrorCode {
+  if (status === 401) return "expired_token";
+  if (status === 403) return "permission_denied";
+  if (status === 429) return "rate_limited";
+  if (status === 413) return "media_too_large";
+  if (status >= 500) return "network_error";
+  const t = (bodyText ?? "").toLowerCase();
+  if (t.includes("too large") || t.includes("file size")) return "media_too_large";
+  if (t.includes("media type") || t.includes("unsupported") || t.includes("format")) return "invalid_media_type";
+  if (t.includes("caption") || t.includes("text") || t.includes("character")) return "invalid_caption";
+  if (t.includes("token") || t.includes("auth")) return "expired_token";
+  if (t.includes("permission") || t.includes("scope")) return "permission_denied";
+  return "api_error";
+}
+
+/**
+ * Pre-flight media check every provider should run before spending a real
+ * API call — the size limits real uploads would fail on regardless of
+ * platform. `PostMedia` doesn't carry a MIME type today, so format
+ * rejections (Phase 10's "Invalid Media Type") stay the platform API
+ * response's job for now, not guessed at here. Platform-specific limits
+ * (Instagram's exact video length cap, etc.) are likewise the API's own
+ * backstop, not duplicated into this generic check.
+ */
+export function validateMediaForPublish(sp: ScheduledEvent): ValidationResult {
+  const errors: string[] = [];
+  for (const m of sp.post?.media ?? []) {
+    const limit = m.type === "video" ? MEDIA.maxVideoBytes : MEDIA.maxImageBytes;
+    if (m.size > limit) errors.push(`${m.name} is too large (max ${Math.round(limit / (1024 * 1024))}MB for ${m.type}).`);
+  }
+  return { ok: errors.length === 0, errors };
 }
 
 export interface ValidationResult {
@@ -102,7 +166,7 @@ export function getPublisher(platform: string): PlatformPublisher {
   return registry.get(platform) ?? stubPublisher;
 }
 
-/** Publish a scheduled post through its platform adapter (stub for now). */
+/** Publish a scheduled post through its platform's registered adapter (falls back to the deterministic stub for any platform without a real one registered, or a connection that's still in Integration Sprint 2's mock OAuth mode). */
 export async function publishScheduledPost(sp: ScheduledEvent): Promise<PublishResult> {
   try {
     return await getPublisher(sp.platform).publish(sp);

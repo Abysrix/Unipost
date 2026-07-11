@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { requireUser, displayName } from "@/lib/auth/getUser";
-import { getRole, getPlan } from "@/lib/auth/role";
+import { requireUser } from "@/lib/auth/getUser";
+import { getOwnProfile } from "@/lib/db/profiles";
 import { isFlagEnabled } from "@/lib/db/admin/flags";
 import AppShell, { type AppUser } from "@/components/app/AppShell";
 import MaintenanceScreen from "@/components/admin/MaintenanceScreen";
@@ -25,18 +25,21 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const role = getRole(user);
+  const profile = await getOwnProfile();
 
-  if (role !== "admin" && (await isFlagEnabled("maintenance_mode"))) {
+  if (profile.role !== "admin" && (await isFlagEnabled("maintenance_mode"))) {
     return <MaintenanceScreen />;
   }
 
   const appUser: AppUser = {
-    name: displayName(user),
-    email: user.email ?? "",
-    avatarUrl: (user.user_metadata as { avatar_url?: string } | undefined)?.avatar_url ?? null,
-    role,
-    plan: getPlan(user),
+    name: profile.display_name || user.email?.split("@")[0] || "Creator",
+    email: profile.email,
+    username: profile.username,
+    avatarUrl: profile.avatar_url,
+    role: profile.role,
+    plan: profile.plan,
+    creatorScore: profile.creator_score,
+    xp: profile.xp,
   };
 
   return <AppShell user={appUser}>{children}</AppShell>;

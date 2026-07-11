@@ -36,12 +36,18 @@ export default function UserMenu({ user }: { user: AppUser }) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={`Account menu for ${user.name}`}
         data-cursor="pointer"
         className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-1 pl-1 pr-2 transition-colors hover:border-white/20"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-aurora-cyan/40 to-aurora-green/40 text-[11px] font-bold text-white">
-          {initials(user.name)}
-        </span>
+        {user.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied avatar URLs, not a local asset next/image can optimize
+          <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-aurora-cyan/40 to-aurora-green/40 text-[11px] font-bold text-white">
+            {initials(user.name)}
+          </span>
+        )}
         <ChevronDown size={13} className={cn("text-white/40 transition-transform", open && "rotate-180")} />
       </button>
 

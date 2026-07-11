@@ -61,6 +61,7 @@ export interface OAuthState {
   /** Where to send the user back to in the app after connecting. */
   returnTo: string;
   iat: number;
+  codeVerifier?: string;
 }
 
 /** Sign a state payload → opaque token to round-trip through the OAuth redirect. */
@@ -92,4 +93,8 @@ export function verifyState(token: string): OAuthState | null {
 
 export function newNonce(): string {
   return randomBytes(16).toString("hex");
+}
+
+export function generateCodeVerifier(): string {
+  return randomBytes(32).toString("base64url");
 }

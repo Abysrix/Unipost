@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient, syncPlanMetadata } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { setPlan } from "@/lib/db/profiles";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import type { Plan } from "@/lib/auth/role";
 import { listAllPosts } from "@/lib/db/posts";
@@ -62,7 +63,7 @@ async function applyPeriodRollover(sub: Subscription): Promise<Subscription> {
   if (sub.cancel_at_period_end) {
     const { data } = await supabase.from("subscriptions").update({ plan: "free", status: "active", cancel_at_period_end: false, current_period_end: null }).eq("id", sub.id).select(SUB_COLS).single();
     await logEvent(sub.user_id, "subscription_canceled", "Subscription ended — moved to Free");
-    await syncPlanMetadata(sub.user_id, "free").catch(() => {});
+    await setPlan(sub.user_id, "free").catch(() => {});
     return data as unknown as Subscription;
   }
 
@@ -180,7 +181,7 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ ok: 
 
   await issueInvoice(userId, sub.id, payment);
   await grantCredits("plan_upgrade", monthlyAllotment(payment.plan), `upgrade:${payment.id}`);
-  await syncPlanMetadata(userId, payment.plan).catch(() => {});
+  await setPlan(userId, payment.plan).catch(() => {});
   await logEvent(userId, "payment_succeeded", `Payment captured for ${planLimits(payment.plan).name}`, { paymentId: payment.id });
   await logEvent(userId, upgrading ? "subscription_upgraded" : "subscription_downgraded", `Now on ${planLimits(payment.plan).name}`, { plan: payment.plan });
 
@@ -346,7 +347,7 @@ export async function adminConfirmPayment(payment: Payment, razorpayPaymentId: s
 
   await admin.from("ai_credit_history").insert({ user_id: payment.user_id, amount: monthlyAllotment(payment.plan), reason: "plan_upgrade", meta: { key: `webhook:${payment.id}` } });
   await admin.from("billing_events").insert({ user_id: payment.user_id, event_type: "payment_succeeded", message: "Confirmed via webhook", metadata: { paymentId: payment.id } });
-  await syncPlanMetadata(payment.user_id, payment.plan).catch(() => {});
+  await setPlan(payment.user_id, payment.plan).catch(() => {});
 }
 
 export async function adminMarkPaymentFailed(orderId: string, reason: string): Promise<void> {

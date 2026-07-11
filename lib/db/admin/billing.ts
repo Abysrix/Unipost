@@ -1,4 +1,5 @@
-import { createAdminClient, syncPlanMetadata } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { setPlan } from "@/lib/db/profiles";
 import { planLimits } from "@/lib/billing/plans";
 import type { Plan } from "@/lib/auth/role";
 import type { Subscription, Payment, Invoice } from "@/types/billing";
@@ -61,7 +62,7 @@ export async function revenueByMonth(months = 6): Promise<{ month: string; amoun
 export async function adminSetPlan(userId: string, plan: Plan, actorId: string): Promise<void> {
   const admin = createAdminClient();
   await admin.from("subscriptions").upsert({ user_id: userId, plan, status: "active" }, { onConflict: "user_id" });
-  await syncPlanMetadata(userId, plan);
+  await setPlan(userId, plan);
   await logAudit("admin_action", "subscription_plan_set", { actorId, targetId: userId, message: `Plan manually set to ${planLimits(plan).name}`, metadata: { plan } });
 }
 

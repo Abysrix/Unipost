@@ -1,11 +1,11 @@
 import { Trophy } from "lucide-react";
 import WidgetContainer from "../WidgetContainer";
-import { summary } from "@/lib/mock/dashboard";
 
-/** Creator Score snapshot — ring + level + XP, links to the full page. */
-export default function CreatorScorePreview() {
+/** Creator Score snapshot — ring + level + XP, links to the full page. `progress` is 0..1 (XP progress within the current level). */
+export default function CreatorScorePreview({ score, level, progress }: { score: number; level: number; progress: number }) {
   const R = 34, C = 2 * Math.PI * R;
-  const offset = C * (1 - summary.creatorScore / 100);
+  const offset = C * (1 - score / 100);
+  const xpPct = Math.round(progress * 100);
   return (
     <WidgetContainer title="Creator Score" icon={Trophy} action={{ label: "Details", href: "/score" }}>
       <div className="flex items-center gap-5">
@@ -16,14 +16,14 @@ export default function CreatorScorePreview() {
             <defs><linearGradient id="scorePrevGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#22d3ee" /><stop offset="100%" stopColor="#facc15" /></linearGradient></defs>
           </svg>
           <div className="absolute flex flex-col items-center">
-            <span className="font-display text-2xl font-bold text-white">{summary.creatorScore}</span>
+            <span className="font-display text-2xl font-bold text-white">{score}</span>
           </div>
         </div>
         <div className="flex-1">
-          <div className="mb-1 flex items-center gap-2"><span className="font-display text-base font-bold text-white">Level {summary.level}</span><span className="rounded-full bg-aurora-teal/15 px-2 py-0.5 text-[10px] text-aurora-teal">Creator</span></div>
-          <div className="mb-1.5 flex justify-between text-[11px] text-white/40"><span>XP</span><span>{summary.xp}%</span></div>
+          <div className="mb-1 flex items-center gap-2"><span className="font-display text-base font-bold text-white">Level {level}</span><span className="rounded-full bg-aurora-teal/15 px-2 py-0.5 text-[10px] text-aurora-teal">Creator</span></div>
+          <div className="mb-1.5 flex justify-between text-[11px] text-white/40"><span>XP</span><span>{xpPct}%</span></div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
-            <div className="h-full rounded-full [background:linear-gradient(90deg,#22d3ee,#34d399,#facc15)]" style={{ width: `${summary.xp}%` }} />
+            <div className="h-full rounded-full [background:linear-gradient(90deg,#22d3ee,#34d399,#facc15)]" style={{ width: `${xpPct}%` }} />
           </div>
         </div>
       </div>

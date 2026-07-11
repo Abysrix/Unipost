@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, XCircle, X } from "lucide-react";
 import { platforms, FUTURE_PLATFORMS, type PlatformId } from "@/config/platforms";
 import type { ConnectionWithPermissions, ConnectedAccount, SyncLog, IntegrationEvent } from "@/types/integrations";
-import { syncNowAction, disconnectAction, getConnectionActivity } from "@/app/(app)/integrations/actions";
+import { syncNowAction, disconnectAction, getConnectionActivity, setDefaultAction, renameAction } from "@/app/(app)/integrations/actions";
 import Modal from "@/components/ui/Modal";
 import PlatformCard from "./PlatformCard";
 import ConnectionCard from "./ConnectionCard";
@@ -65,6 +65,16 @@ export default function IntegrationsHub({
     setDetailId(null);
   }
 
+  async function setDefault(account: ConnectedAccount) {
+    await setDefaultAction(account.id);
+    setConnections((prev) => prev.map((c) => (c.platform === account.platform ? { ...c, is_default: c.id === account.id } : c)));
+  }
+
+  async function rename(account: ConnectedAccount, nickname: string) {
+    await renameAction(account.id, nickname);
+    setConnections((prev) => prev.map((c) => (c.id === account.id ? { ...c, nickname: nickname.trim() || null } : c)));
+  }
+
   return (
     <div>
       {notice && !dismissed && (
@@ -95,7 +105,16 @@ export default function IntegrationsHub({
               <AccountSelector accounts={siblingAccounts} value={detail.id} onChange={(id) => { const acc = siblingAccounts.find((a) => a.id === id); if (acc) void openDetail(acc); }} />
             )}
             {activity ? (
-              <ConnectionCard connection={detail} logs={activity.logs} events={activity.events} onSync={() => sync(detail)} onDisconnect={() => setDisconnectTarget(detail)} syncing={syncingId === detail.id} />
+              <ConnectionCard
+                connection={detail}
+                logs={activity.logs}
+                events={activity.events}
+                onSync={() => sync(detail)}
+                onDisconnect={() => setDisconnectTarget(detail)}
+                onSetDefault={() => setDefault(detail)}
+                onRename={(nickname) => rename(detail, nickname)}
+                syncing={syncingId === detail.id}
+              />
             ) : (
               <div className="flex h-40 items-center justify-center text-sm text-white/30">Loading…</div>
             )}

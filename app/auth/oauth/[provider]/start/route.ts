@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/getUser";
 import { platforms, type PlatformId } from "@/config/platforms";
-import { signState, newNonce } from "@/lib/integrations/crypto";
-import { buildAuthorizeUrl } from "@/lib/integrations/oauth";
+import { signState, newNonce, generateCodeVerifier } from "@/lib/integrations/crypto";
+import { buildAuthorizeUrl, requiresPkce } from "@/lib/integrations/oauth";
 
 export const runtime = "nodejs";
 
@@ -27,8 +27,11 @@ export async function GET(request: Request, { params }: { params: { provider: st
   const redirectUri = `${origin}/auth/oauth/${platform}/callback`;
 
   try {
-    const state = signState({ userId: user.id, platform, nonce: newNonce(), returnTo, iat: Date.now() });
-    const authorizeUrl = buildAuthorizeUrl(platform, state, redirectUri);
+    // A PKCE verifier has to be chosen before the state is signed, since the
+    // state is what carries it across to the callback's token exchange.
+    const codeVerifier = requiresPkce(platform) ? generateCodeVerifier() : undefined;
+    const state = signState({ userId: user.id, platform, nonce: newNonce(), returnTo, iat: Date.now(), codeVerifier });
+    const authorizeUrl = buildAuthorizeUrl(platform, state, redirectUri, codeVerifier);
     const target = authorizeUrl.startsWith("http") ? authorizeUrl : `${origin}${authorizeUrl}`;
     return NextResponse.redirect(target);
   } catch {

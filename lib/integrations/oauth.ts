@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import type { PlatformId } from "@/config/platforms";
 import type { ProviderProfile, ProviderTokens } from "@/types/integrations";
 import { providerConfig, hasRealCredentials, getClientId, getClientSecret } from "./providers";
@@ -53,12 +53,21 @@ function stubTokens(scope: string): ProviderTokens {
   };
 }
 
+export function requiresPkce(platform: PlatformId): boolean {
+  return Boolean(providerConfig(platform).pkce);
+}
+
 /**
  * The URL to send the browser to. Real provider URL once credentials exist;
  * otherwise an internal mock-consent page that round-trips through the same
  * callback route.
  */
-export function buildAuthorizeUrl(platform: PlatformId, state: string, redirectUri: string): string {
+export function buildAuthorizeUrl(
+  platform: PlatformId,
+  state: string,
+  redirectUri: string,
+  codeVerifier?: string,
+): string {
   const config = providerConfig(platform);
   if (!hasRealCredentials(platform)) {
     return `/integrations/connect/${platform}?state=${encodeURIComponent(state)}`;
@@ -69,7 +78,24 @@ export function buildAuthorizeUrl(platform: PlatformId, state: string, redirectU
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", config.scopes.join(" "));
   url.searchParams.set("state", state);
-  for (const [k, v] of Object.entries(config.extraAuthParams ?? {})) url.searchParams.set(k, v);
+  
+  // Clean up any temporary placeholder auth params if we are going to supply real PKCE challenge
+  const extraParams = { ...config.extraAuthParams };
+  if (codeVerifier) {
+    delete extraParams.code_challenge;
+    delete extraParams.code_challenge_method;
+  }
+  
+  for (const [k, v] of Object.entries(extraParams)) {
+    url.searchParams.set(k, v);
+  }
+  
+  if (codeVerifier) {
+    const challenge = createHash("sha256").update(codeVerifier).digest("base64url");
+    url.searchParams.set("code_challenge", challenge);
+    url.searchParams.set("code_challenge_method", "S256");
+  }
+  
   return url.toString();
 }
 
@@ -95,6 +121,7 @@ export async function exchangeCode(
   code: string,
   redirectUri: string,
   seedKey: string,
+  codeVerifier?: string,
 ): Promise<{ tokens: ProviderTokens; profile: ProviderProfile }> {
   const config = providerConfig(platform);
   if (!hasRealCredentials(platform)) {
@@ -108,6 +135,9 @@ export async function exchangeCode(
     client_id: getClientId(config) as string,
     client_secret: getClientSecret(config) as string,
   });
+  if (codeVerifier) {
+    body.set("code_verifier", codeVerifier);
+  }
   const tokenRes = await fetch(config.tokenUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
   if (!tokenRes.ok) throw new Error(`${config.displayName} token exchange failed (${tokenRes.status}).`);
   const json = (await tokenRes.json()) as Record<string, unknown>;
@@ -144,12 +174,27 @@ export async function refreshAccessToken(platform: PlatformId, refreshToken: str
   };
 }
 
-/** Best-effort revoke. No-op for stub tokens or providers without a revoke endpoint. */
+/**
+ * Best-effort revoke. No-op for stub tokens or providers without a revoke
+ * endpoint. Providers don't agree on the shape of this call — `revokeMethod`
+ * picks which one:
+ *  - "meta"   → DELETE {revokeUrl}?access_token=... (Instagram/Facebook/
+ *               Threads; the token itself authenticates the call)
+ *  - "google" → POST {revokeUrl}?token=... (YouTube)
+ * LinkedIn/X have no `revokeMethod` set (their real revoke endpoints need
+ * client credentials in the body, a third shape not implemented without a
+ * real app to verify it against — see providers.ts) — falls through to a
+ * safe no-op; disconnecting still deletes UniPost's own copy of the token.
+ */
 export async function revokeAccessToken(platform: PlatformId, accessToken: string): Promise<void> {
   const config = providerConfig(platform);
-  if (!config.revokeUrl || accessToken.startsWith("stub_access_")) return;
+  if (!config.revokeUrl || !config.revokeMethod || accessToken.startsWith("stub_access_")) return;
   try {
-    await fetch(`${config.revokeUrl}?token=${encodeURIComponent(accessToken)}`, { method: "POST" });
+    if (config.revokeMethod === "meta") {
+      await fetch(`${config.revokeUrl}?access_token=${encodeURIComponent(accessToken)}`, { method: "DELETE" });
+    } else if (config.revokeMethod === "google") {
+      await fetch(`${config.revokeUrl}?token=${encodeURIComponent(accessToken)}`, { method: "POST" });
+    }
   } catch {
     /* best-effort */
   }

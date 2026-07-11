@@ -53,6 +53,28 @@ export async function validateAction(id: string): Promise<SyncOutcome> {
   return res;
 }
 
+export async function setDefaultAction(id: string): Promise<{ error?: string }> {
+  await guard();
+  try {
+    await db.setDefaultAccount(id);
+    revalidate();
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to set default account." };
+  }
+}
+
+export async function renameAction(id: string, nickname: string): Promise<{ error?: string }> {
+  await guard();
+  try {
+    await db.renameConnection(id, nickname.trim() || null);
+    revalidate();
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to rename." };
+  }
+}
+
 /** Fetched lazily when a connection's detail view opens (not on every hub load). */
 export async function getConnectionActivity(id: string): Promise<{ logs: SyncLog[]; events: IntegrationEvent[] }> {
   await guard();
