@@ -9,7 +9,7 @@ import WidgetContainer from "@/components/dashboard/WidgetContainer";
 import { validateForPlatforms, tightestLimit } from "@/lib/validations/post";
 import type { Post, PostInput, PostMedia, PostVisibility } from "@/types/post";
 import type { PlatformId } from "@/config/platforms";
-import { saveDraft, deleteDraft, duplicateDraft } from "@/app/(app)/create/actions";
+import { saveDraft, deleteDraft, duplicateDraft, publishNowFromCreate } from "@/app/(app)/create/actions";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import PostEditor from "./PostEditor";
 import PlatformSelector from "./PlatformSelector";
@@ -48,6 +48,8 @@ export default function CreateStudio({
   const [view, setView] = useState<"compose" | "preview">("compose");
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [preparingSchedule, setPreparingSchedule] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const mediaRef = useRef<MediaUploaderHandle>(null);
   const idRef = useRef<string | null>(id);
@@ -125,6 +127,25 @@ export default function CreateStudio({
     if (idRef.current) setScheduleOpen(true);
   };
 
+  const onPublishNow = async () => {
+    setPublishError(null);
+    setPublishing(true);
+    debounced.cancel();
+    const res = await publishNowFromCreate(idRef.current, latest.current);
+    setPublishing(false);
+    if (res.ok) {
+      if (res.postId && !idRef.current) {
+        idRef.current = res.postId;
+        setId(res.postId);
+        window.history.replaceState(null, "", `/create?id=${res.postId}`);
+      }
+      setStatus("saved");
+      setDirty(false);
+    } else {
+      setPublishError(res.errors?.join(" · ") ?? "Publishing failed");
+    }
+  };
+
   const validations = validateForPlatforms(content, media, platforms);
   const limit = tightestLimit(platforms);
   const isNew = !id;
@@ -194,15 +215,22 @@ export default function CreateStudio({
           )}
 
           <div className="mt-6">
+            {publishError && (
+              <p className="mb-2 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-3 py-2 text-xs text-red-300">
+                {publishError}
+              </p>
+            )}
             <PostActions
               isNew={isNew}
               saving={status === "saving"}
               scheduling={preparingSchedule}
+              publishing={publishing}
               isPublished={isPublished}
               onSave={() => { debounced.cancel(); void saveNow(); }}
               onDuplicate={onDuplicate}
               onDelete={onDelete}
               onSchedule={isPublished ? undefined : (() => void onSchedule())}
+              onPublishNow={isPublished ? undefined : (platforms.length > 0 ? () => void onPublishNow() : undefined)}
             />
           </div>
         </div>

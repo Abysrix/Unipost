@@ -6,6 +6,7 @@ import { getPlatform, type PlatformId } from "@/config/platforms";
 import { postInputSchema } from "@/lib/validations/post";
 import type { PostInput } from "@/types/post";
 import * as db from "@/lib/db/posts";
+import { createSchedules, publishNow as dbPublishNow } from "@/lib/db/schedule";
 
 export type SaveResult = { id: string; updatedAt: string } | { error: string };
 
@@ -80,5 +81,49 @@ export async function permanentlyDeleteDraft(id: string): Promise<{ error?: stri
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to delete" };
+  }
+}
+
+/**
+ * Save (or update) the post, create one schedule per selected platform set to
+ * "right now", and immediately publish all of them via the publishing service.
+ * Returns per-platform results.
+ */
+export async function publishNowFromCreate(
+  id: string | null,
+  input: PostInput,
+): Promise<{ ok: boolean; postId?: string; errors?: string[] }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, errors: ["Not authenticated"] };
+
+  const parsed = postInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, errors: [parsed.error.errors[0]?.message ?? "Invalid input"] };
+
+  const clean: PostInput = { ...parsed.data, platforms: cleanPlatforms(parsed.data.platforms) };
+  if (clean.platforms.length === 0) return { ok: false, errors: ["Select at least one platform to publish to."] };
+
+  try {
+    // 1. Save/update the post
+    const post = id ? await db.updatePost(id, clean) : await db.insertDraft(clean);
+
+    // 2. Create schedule rows set to now (immediate)
+    const now = new Date().toISOString();
+    const schedules = await createSchedules({
+      postId: post.id,
+      platforms: clean.platforms,
+      scheduledTime: now,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    });
+
+    // 3. Publish each schedule immediately
+    const results = await Promise.all(schedules.map((sp) => dbPublishNow(sp.id)));
+    const errors = results.flatMap((r) => (r.ok ? [] : [r.error ?? "Unknown error"]));
+
+    revalidatePath("/posts");
+    revalidatePath("/calendar");
+
+    return { ok: errors.length === 0, postId: post.id, errors: errors.length ? errors : undefined };
+  } catch (e) {
+    return { ok: false, errors: [e instanceof Error ? e.message : "Failed to publish"] };
   }
 }
