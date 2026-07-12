@@ -74,16 +74,16 @@ export async function listScoreHistory(limit = 30): Promise<CreatorScoreRow[]> {
 
 /** Insert a new score snapshot at most once per calendar day. Returns the latest row either way. */
 async function recomputeScoreIfStale(stats: CreatorStats): Promise<CreatorScoreRow> {
-  const supabase = createClient();
+  const admin = createAdminClient();
   const userId = await uid();
-  const { data: latest, error } = await supabase.from("creator_scores").select(SCORE_COLS).order("computed_at", { ascending: false }).limit(1).maybeSingle();
+  const { data: latest, error } = await admin.from("creator_scores").select(SCORE_COLS).order("computed_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw error;
   const latestRow = latest as unknown as CreatorScoreRow | null;
   if (latestRow && latestRow.computed_at.slice(0, 10) === todayKey()) return latestRow;
 
   const breakdown = computeScoreBreakdown(stats);
   const score = weightedTotal(breakdown);
-  const { data, error: insErr } = await supabase
+  const { data, error: insErr } = await admin
     .from("creator_scores")
     .insert({ user_id: userId, score, grade: gradeFor(score), ...breakdown })
     .select(SCORE_COLS)
