@@ -28,7 +28,7 @@ function SidebarContent({ user, collapsed }: { user: AppUser; collapsed: boolean
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary">
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary" data-lenis-prevent>
         {navGroups.map((group) => {
           const items = group.items.filter((i) => hasRole(user.role, i.role));
           if (!items.length) return null;

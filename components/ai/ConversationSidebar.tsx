@@ -47,7 +47,7 @@ export default function ConversationSidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto p-2" data-lenis-prevent>
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center text-white/30">
             <MessageSquare size={18} />

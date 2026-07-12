@@ -54,7 +54,7 @@ export default function AIChat({
 
   return (
     <div className="flex h-full min-h-[60vh] flex-col rounded-2xl border border-white/[0.07] bg-white/[0.02] lg:min-h-0">
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-5" data-lenis-prevent>
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-6 py-10 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl [background:linear-gradient(120deg,#22d3ee,#34d399,#facc15)]">

@@ -193,7 +193,7 @@ export default function Calendar({ events, view, cursor, onOpenEvent, onReschedu
             </button>
           ))}
         </div>
-        <div className="max-h-[600px] overflow-y-auto">
+        <div className="max-h-[600px] overflow-y-auto" data-lenis-prevent>
           <div className="relative flex" style={{ height: HOURS.length * HOUR_PX }}>
             {/* hour gutter */}
             <div className="w-12 shrink-0">

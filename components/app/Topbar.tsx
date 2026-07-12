@@ -129,7 +129,7 @@ function NotificationBell({ notifications }: { notifications: Notification[] }) 
               <p className="text-xs text-white/30">New activity will show up here.</p>
             </div>
           ) : (
-            <ul className="max-h-96 overflow-y-auto">
+            <ul className="max-h-96 overflow-y-auto" data-lenis-prevent>
               {items.map((n) => {
                 const Icon = NOTIFICATION_ICON[n.type] ?? Bell;
                 const unread = !n.read_at;

@@ -110,7 +110,7 @@ export default function ScheduleModal({
             {drafts.length === 0 ? (
               <p className="text-sm text-white/40">No drafts yet — create one first.</p>
             ) : (
-              <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-white/[0.08] bg-white/[0.02] p-1.5">
+              <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-white/[0.08] bg-white/[0.02] p-1.5" data-lenis-prevent>
                 {drafts.map((d) => {
                   const checked = selectedIds.includes(d.id);
                   return (
