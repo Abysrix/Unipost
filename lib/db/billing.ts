@@ -311,13 +311,16 @@ export async function refreshUsageMetrics(): Promise<UsageSnapshot> {
 
 /* ── Orchestration ── */
 export async function getBillingBundle(): Promise<BillingBundle> {
-  const subscription = await getOrCreateSubscription();
+  let subscription: Subscription | undefined;
+  try { subscription = await getOrCreateSubscription(); }
+  catch (e) { console.error("Error in getOrCreateSubscription:", e); throw e; }
+
   const [creditsRemaining, usage, payments, invoices, events] = await Promise.all([
-    getCreditBalance(),
-    refreshUsageMetrics(),
-    listPayments(),
-    listInvoices(),
-    listBillingEvents(),
+    getCreditBalance().catch(e => { console.error("Error in getCreditBalance:", e); throw e; }),
+    refreshUsageMetrics().catch(e => { console.error("Error in refreshUsageMetrics:", e); throw e; }),
+    listPayments().catch(e => { console.error("Error in listPayments:", e); throw e; }),
+    listInvoices().catch(e => { console.error("Error in listInvoices:", e); throw e; }),
+    listBillingEvents().catch(e => { console.error("Error in listBillingEvents:", e); throw e; }),
   ]);
   return { subscription, creditsRemaining, creditsTotal: monthlyAllotment(subscription.plan), usage, payments, invoices, events };
 }
