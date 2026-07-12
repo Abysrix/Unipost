@@ -84,7 +84,10 @@ export default function AIStudio({
         body: JSON.stringify({ conversationId: convAtStart, content, model, regenerate: opts?.regenerate ?? false }),
         signal: controller.signal,
       });
-      if (!res.ok || !res.body) throw new Error("Request failed");
+      if (!res.ok || !res.body) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || "Request failed");
+      }
 
       const convId = res.headers.get("x-conversation-id");
       if (convId && convId !== convAtStart) {
@@ -103,7 +106,8 @@ export default function AIStudio({
       }
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
-        setMessages((m) => m.map((msg) => (msg.id === asstId && !msg.content ? { ...msg, content: "⚠ Something went wrong. Please try again." } : msg)));
+        const errMsg = (e as Error).message || "Something went wrong. Please try again.";
+        setMessages((m) => m.map((msg) => (msg.id === asstId && !msg.content ? { ...msg, content: `⚠ ${errMsg}` } : msg)));
       }
     } finally {
       setStreaming(false);
