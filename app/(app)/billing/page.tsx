@@ -13,10 +13,13 @@ export default async function BillingPage() {
   await requireUser();
 
   let bundle: BillingBundle | null = null;
+  let loadError: string | null = null;
+
   try {
     bundle = await getBillingBundle();
-  } catch {
-    /* billing tables not migrated yet */
+  } catch (err) {
+    console.error("Billing page error:", err);
+    loadError = err instanceof Error ? err.message : JSON.stringify(err);
   }
 
   return (
@@ -25,9 +28,17 @@ export default async function BillingPage() {
       {bundle ? (
         <BillingPageClient bundle={bundle} />
       ) : (
-        <p className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-8 text-center text-sm text-white/40">
-          Billing isn&apos;t set up yet — run migration <code className="text-white/60">0007_billing.sql</code> to enable this page.
-        </p>
+        <div className="space-y-4">
+          <p className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-8 text-center text-sm text-white/40">
+            Billing isn&apos;t set up yet — run migration <code className="text-white/60">0007_billing.sql</code> to enable this page.
+          </p>
+          {loadError && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/[0.05] p-4 font-mono text-xs text-red-400">
+              <span className="mb-2 block font-bold text-red-500">Debug Info (Why it failed):</span>
+              {loadError}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
