@@ -4,12 +4,13 @@ import { instagramAnalyticsProvider } from "./providers/instagram";
 import { facebookAnalyticsProvider } from "./providers/facebook";
 import { linkedinAnalyticsProvider } from "./providers/linkedin";
 import { xAnalyticsProvider } from "./providers/x";
+import { youtubeAnalyticsProvider } from "./providers/youtube";
 
 /**
  * Registry of real analytics providers — mirrors `lib/schedule/publishing.ts`'s
  * `PlatformPublisher` registry from Integration Sprint 3 exactly, including the
  * direct-Map-literal registration convention. Platforms with no entry here
- * (YouTube, Threads) have no real analytics provider built yet — callers fall
+ * (Threads) have no real analytics provider built yet — callers fall
  * back to the existing simulated backfill for those, same as an unregistered
  * platform falls back to `stubPublisher` for publishing.
  */
@@ -18,6 +19,7 @@ const registry = new Map<string, AnalyticsProvider>([
   ["facebook", facebookAnalyticsProvider],
   ["linkedin", linkedinAnalyticsProvider],
   ["x", xAnalyticsProvider],
+  ["youtube", youtubeAnalyticsProvider],
 ]);
 
 export function getAnalyticsProvider(platform: PlatformId): AnalyticsProvider | null {
