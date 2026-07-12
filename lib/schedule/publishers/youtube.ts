@@ -161,8 +161,16 @@ export const youtubePublisher: PlatformPublisher = {
     }
   },
 
-  async delete(externalId: string, accountId?: string) {
-    if (!accountId) return { ok: true, externalId }; // fallback
+  async delete(externalId: string) {
+    // The interface only carries a bare externalId, no account context — same
+    // known limitation as every other real provider here (see instagram/
+    // facebook/linkedin/x.ts): resolves against the platform's *current*
+    // default account, not necessarily whichever one originally published
+    // this video. Resolving it here (instead of accepting an accountId
+    // parameter nothing supplies) is the fix — the previous version silently
+    // returned a fake success without ever calling YouTube's API.
+    const accountId = await getDefaultAccountId("youtube");
+    if (!accountId) return { ok: false, error: "No connected YouTube channel to delete through." };
     const accessToken = await getValidAccessToken(accountId);
     if (!accessToken) return { ok: false, error: "Access token missing." };
 

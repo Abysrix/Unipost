@@ -1,11 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import type { PlatformId } from "@/config/platforms";
 import type { ScheduledEvent, ScheduledPost, ScheduleStatus } from "@/types/schedule";
 import { publishScheduledPost } from "@/lib/schedule/publishing";
+import { getDefaultAccountId } from "@/lib/db/integrations";
 import { awardXp } from "@/lib/db/xp";
 import { getCurrentPlan } from "@/lib/db/plan";
 import { planLimits } from "@/lib/billing/plans";
+import { invalidateCreatorContext } from "@/lib/ai/contextCache";
 
 /** Server-only scheduling data layer. RLS enforces per-user ownership. */
 
@@ -16,7 +19,7 @@ async function uid(): Promise<string> {
 }
 
 const SP_COLS =
-  "id,user_id,post_id,platform,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,published_at,created_at,updated_at";
+  "id,user_id,post_id,platform,connected_account_id,scheduled_time,timezone,duration_min,status,priority,position,retry_count,max_retries,error,platform_post_id,published_at,created_at,updated_at";
 const EVENT_SELECT = `${SP_COLS}, post:posts(id,title,content,media,visibility)`;
 
 /* ── Reads ── */
@@ -39,15 +42,27 @@ export async function getEvent(id: string): Promise<ScheduledEvent | null> {
 
 
 /* ── Internal helpers ── */
-async function log(userId: string, sp: { id: string; post_id: string; platform: string }, status: string, message?: string): Promise<void> {
-  const supabase = createClient();
-  await supabase.from("publishing_logs").insert({
+async function log(
+  userId: string,
+  sp: { id: string; post_id: string; platform: string },
+  status: string,
+  message?: string,
+  metadata?: Record<string, unknown>,
+): Promise<void> {
+  // publishing_logs is a system-computed audit trail (migration 0017) — admin
+  // client, same reasoning as every other write-lockdown this Integration
+  // Phase has applied. userId is always the caller's own uid() (never
+  // user-suppliable), so this doesn't widen who can write, only stops a
+  // direct client call from forging a fake publish history.
+  const admin = createAdminClient();
+  await admin.from("publishing_logs").insert({
     user_id: userId,
     scheduled_post_id: sp.id,
     post_id: sp.post_id,
     platform: sp.platform,
     status,
     message: message ?? null,
+    metadata: metadata ?? {},
   });
 }
 
@@ -99,10 +114,16 @@ export async function createSchedules(input: {
   }
 
   const positions = await nextPositions(userId, input.platforms);
-  const rows = input.platforms.map((platform) => ({
+  // Snapshot each platform's default connected account now — re-resolved
+  // again at publish time regardless (the user may reconnect or switch
+  // their default in between), but storing it up front means the queue can
+  // show which account a schedule will publish through before that moment.
+  const accountIds = await Promise.all(input.platforms.map((platform) => getDefaultAccountId(platform, userId)));
+  const rows = input.platforms.map((platform, i) => ({
     user_id: userId,
     post_id: input.postId,
     platform,
+    connected_account_id: accountIds[i],
     scheduled_time: input.scheduledTime,
     timezone: input.timezone,
     duration_min: input.durationMin ?? 30,
@@ -163,6 +184,15 @@ export async function removeSchedule(id: string): Promise<void> {
 export async function retrySchedule(id: string): Promise<void> {
   const userId = await uid();
   const supabase = createClient();
+
+  const { data: existing, error: fetchError } = await supabase.from("scheduled_posts").select("retry_count,max_retries").eq("id", id).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!existing) throw new Error("Schedule not found.");
+  const { retry_count, max_retries } = existing as { retry_count: number; max_retries: number };
+  if (retry_count >= max_retries) {
+    throw new Error(`Retry limit reached (${retry_count}/${max_retries}). Edit and reschedule this post instead.`);
+  }
+
   const { data, error } = await supabase.from("scheduled_posts").update({ status: "queued", error: null }).eq("id", id).select("id,post_id,platform").single();
   if (error) throw error;
   const sp = data as { id: string; post_id: string; platform: string };
@@ -202,39 +232,59 @@ export async function archiveSchedule(id: string): Promise<void> {
 }
 
 /**
- * Publish immediately through the publishing service (stub). Drives the
- * scheduled → publishing → published|failed transition with logging + retry.
+ * Publish immediately through the publishing service (real provider adapter
+ * when one's registered and the connection is genuine, deterministic stub
+ * otherwise). Drives the scheduled → publishing → published|failed
+ * transition with logging + retry.
  */
 export async function publishNow(id: string): Promise<{ ok: boolean; error?: string }> {
   const userId = await uid();
   const supabase = createClient();
 
-  const sp = await getEvent(id);
-  if (!sp) return { ok: false, error: "Schedule not found." };
+  const existing = await getEvent(id);
+  if (!existing) return { ok: false, error: "Schedule not found." };
+  if (existing.status === "failed" && existing.retry_count >= existing.max_retries) {
+    return { ok: false, error: `Retry limit reached (${existing.retry_count}/${existing.max_retries}). Edit and reschedule this post instead.` };
+  }
 
-  await supabase.from("scheduled_posts").update({ status: "publishing" }).eq("id", id);
+  // Atomic claim: the conditional UPDATE only matches a row still in a
+  // publishable status, so two concurrent triggers — a double click, or the
+  // background cron worker (lib/db/admin/scheduler.ts) racing a manual
+  // "Publish now" — can't both pass and both fire a real platform API call.
+  const { data: claimed, error: claimError } = await supabase
+    .from("scheduled_posts")
+    .update({ status: "publishing" })
+    .eq("id", id)
+    .in("status", ["scheduled", "queued", "failed"])
+    .select("id")
+    .maybeSingle();
+  if (claimError) throw claimError;
+  if (!claimed) return { ok: false, error: "This post is already publishing or has already been published." };
+
+  const sp: ScheduledEvent = { ...existing, status: "publishing" };
   await log(userId, sp, "publishing", "Publishing…");
 
   const result = await publishScheduledPost(sp);
 
   if (result.ok) {
-    await supabase.from("scheduled_posts").update({ 
-      status: "published", 
-      published_at: new Date().toISOString(), 
+    await supabase.from("scheduled_posts").update({
+      status: "published",
+      published_at: new Date().toISOString(),
       platform_post_id: result.externalId ?? null,
-      error: null 
+      error: null,
     }).eq("id", id);
-    await log(userId, sp, "published", result.externalId ? `Published (${result.externalId})` : "Published");
+    await log(userId, sp, "published", result.externalId ? `Published (${result.externalId})` : "Published", result.responseMeta);
     await syncPostStatus(sp.post_id);
     try {
       await awardXp("post_published", `scheduled_post:${sp.id}`);
     } catch {
       /* XP is best-effort; publishing already succeeded */
     }
+    await invalidateCreatorContext(userId).catch(() => {});
     return { ok: true };
   }
 
   await supabase.from("scheduled_posts").update({ status: "failed", error: result.error ?? "Publishing failed", retry_count: sp.retry_count + 1 }).eq("id", id);
-  await log(userId, sp, "failed", result.error);
+  await log(userId, sp, "failed", result.error, { errorCode: result.errorCode, ...(result.responseMeta ?? {}) });
   return { ok: false, error: result.error };
 }

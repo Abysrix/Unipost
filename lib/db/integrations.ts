@@ -9,6 +9,7 @@ import { isTokenNearExpiry, isAuthError, withRetry, type SyncOutcome } from "@/l
 import { getCurrentPlan } from "@/lib/db/plan";
 import { planLimits } from "@/lib/billing/plans";
 import { seedAnalyticsForPlatform } from "@/lib/db/growth";
+import { invalidateCreatorContext } from "@/lib/ai/contextCache";
 import type {
   ConnectedAccount, ConnectionWithPermissions, PlatformPermission,
   SyncLog, SyncType, IntegrationEvent, IntegrationEventType, ProviderProfile, ProviderTokens,
@@ -69,10 +70,19 @@ export async function listIntegrationEvents(accountId?: string, limit = 20): Pro
   return (data ?? []) as unknown as IntegrationEvent[];
 }
 
-/** Decrypted tokens for server-only use (sync, publishing). Never sent to the client. */
+/**
+ * Decrypted tokens for server-only use (sync, publishing). Never sent to the
+ * client. Admin client, not request-scoped — this must also work from the
+ * cron/background publisher (`lib/db/admin/scheduler.ts`), which has no
+ * user session for RLS's `auth.uid() = user_id` to match against. Safe:
+ * every existing caller already resolves `accountId` through its own
+ * properly-scoped path first (an interactive session's `uid()`-checked
+ * `getConnection`, or the cron worker's own admin-scoped `scheduled_posts`
+ * read) — this is a narrow, always-specific-id lookup, not a listing.
+ */
 export async function getDecryptedTokens(accountId: string): Promise<{ accessToken: string; refreshToken: string | null; expiresAt: string | null } | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase.from("oauth_tokens").select("access_token_enc,refresh_token_enc,expires_at").eq("connected_account_id", accountId).maybeSingle();
+  const admin = createAdminClient();
+  const { data, error } = await admin.from("oauth_tokens").select("access_token_enc,refresh_token_enc,expires_at").eq("connected_account_id", accountId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
   const row = data as { access_token_enc: string; refresh_token_enc: string | null; expires_at: string | null };
@@ -198,6 +208,7 @@ export async function completeConnection(platform: PlatformId, profile: Provider
   await savePermissions(account.id, userId, platform, tokens.scope);
   await logEvent(userId, platform, isReconnect ? "reconnected" : "connected", account.id, `${isReconnect ? "Reconnected" : "Connected"} ${profile.displayName}`);
   await seedAnalyticsForPlatform(platform).catch(() => {});
+  await invalidateCreatorContext(userId).catch(() => {});
 
   return account;
 }
@@ -330,21 +341,52 @@ export async function getDefaultAccountId(platform: PlatformId, userId?: string)
 }
 
 /**
+ * Narrow admin-scoped connection lookup for internal use only — no RLS
+ * dependency, since it's always called with an `accountId` already resolved
+ * through a properly-scoped path (an interactive session's own
+ * `uid()`-checked query, or the cron worker's own trustworthy
+ * `scheduled_posts` read). Not exported: general-purpose reads should go
+ * through `getConnection`, which still enforces per-user ownership via RLS.
+ */
+async function getAccountPlatform(accountId: string): Promise<{ user_id: string; platform: PlatformId } | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("connected_accounts").select("user_id,platform").eq("id", accountId).maybeSingle();
+  return (data as { user_id: string; platform: PlatformId } | null) ?? null;
+}
+
+/**
+ * The platform's own external account id (`connected_accounts.account_id` —
+ * e.g. a LinkedIn member id or Instagram/Facebook user id), as opposed to
+ * `accountId` elsewhere in this module, which always means UniPost's
+ * internal `connected_accounts.id`. Providers that must embed the external
+ * id in a request body (LinkedIn's `author` URN) need this; most don't.
+ * Admin-scoped for the same cron-safety reason as `getAccountPlatform` above.
+ */
+export async function getAccountExternalId(accountId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("connected_accounts").select("account_id").eq("id", accountId).maybeSingle();
+  return (data as { account_id: string } | null)?.account_id ?? null;
+}
+
+/**
  * Silent refresh — returns a definitely-usable access token, transparently
  * refreshing first if it's near expiry. Anything that needs to actually call
- * a provider's API (a future publish/analytics-sync call) should go through
- * this instead of `getDecryptedTokens` directly, so it never hands back a
- * token that's about to be rejected.
+ * a provider's API (publish/analytics-sync) should go through this instead
+ * of `getDecryptedTokens` directly, so it never hands back a token that's
+ * about to be rejected. Works from both an interactive session and the
+ * cron/background publisher (`lib/db/admin/scheduler.ts`), which has no
+ * session at all — hence the admin-scoped lookup below instead of
+ * `getConnection`.
  */
 export async function getValidAccessToken(accountId: string): Promise<string | null> {
   const tokens = await getDecryptedTokens(accountId);
   if (!tokens) return null;
   if (!isTokenNearExpiry(tokens.expiresAt) || !tokens.refreshToken) return tokens.accessToken;
 
-  const account = await getConnection(accountId);
+  const account = await getAccountPlatform(accountId);
   if (!account) return null;
   const userId = account.user_id;
-  
+
   const refreshed = await withRetry(() => refreshAccessToken(account.platform, tokens.refreshToken as string));
   await saveTokens(accountId, userId, refreshed);
   await logEvent(userId, account.platform, "token_refreshed", accountId, "Access token silently refreshed");

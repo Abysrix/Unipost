@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import type { Role, Plan } from "@/lib/auth/role";
+import type { Notification } from "@/lib/notifications/service";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 
@@ -36,7 +37,7 @@ export function useAppShell(): ShellCtx {
  * sidebar (collapsible on desktop, a drawer on mobile) and a sticky topbar.
  * Server layout passes the resolved `user`; interactivity lives here.
  */
-export default function AppShell({ user, children }: { user: AppUser; children: React.ReactNode }) {
+export default function AppShell({ user, notifications = [], children }: { user: AppUser; notifications?: Notification[]; children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -66,7 +67,7 @@ export default function AppShell({ user, children }: { user: AppUser; children: 
       <div className="flex min-h-[100svh] bg-bg-primary">
         <Sidebar user={user} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar user={user} />
+          <Topbar user={user} notifications={notifications} />
           <main id="main" className="flex-1 px-5 py-6 md:px-8 md:py-8">
             {children}
           </main>

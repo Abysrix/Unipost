@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/billing/razorpay";
 import { adminFindPaymentByOrderId, adminConfirmPayment, adminMarkPaymentFailed } from "@/lib/db/billing";
+import { logWebhookEvent, markWebhookProcessed } from "@/lib/webhooks/log";
 import { logger } from "@/lib/monitoring/logger";
 
 export const runtime = "nodejs";
@@ -38,6 +39,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Bad payload" }, { status: 400 });
   }
 
+  // Real idempotency (Integration Sprint 6) — a signature-valid retry of the
+  // identical payload (Razorpay does retry on non-2xx, per the comment
+  // below) now hits webhook_events' unique (provider, payload_hash) index
+  // instead of re-running adminConfirmPayment/adminMarkPaymentFailed a
+  // second time. This was a real gap before: confirmPayment's own
+  // `if (payment.status === "captured") return` made *that* path idempotent
+  // already, but adminMarkPaymentFailed had no equivalent guard.
+  const log = await logWebhookEvent("razorpay", rawBody, payload.event, true, payload);
+  if (log.isDuplicate) {
+    return NextResponse.json({ ok: true, duplicate: true });
+  }
+
   const entity = payload.payload?.payment?.entity;
   const orderId = entity?.order_id;
 
@@ -59,9 +72,11 @@ export async function POST(req: Request) {
       default:
         break;
     }
+    if (log.eventId) await markWebhookProcessed(log.eventId, "processed");
   } catch (e) {
     // Razorpay retries on non-2xx — log and still 200 once we've done what we can,
     // to avoid a retry storm on a permanently-failing event.
+    if (log.eventId) await markWebhookProcessed(log.eventId, "failed", e instanceof Error ? e.message : String(e));
     logger.error(e, { source: "razorpay_webhook", event: payload.event });
   }
 

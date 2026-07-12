@@ -22,7 +22,17 @@ export default function SystemHealthPanel({ initialChecks, lastCheckedAt }: { in
     const res = await runHealthCheckAction();
     setBusy(false);
     if (res.error) return setError(res.error);
-    if (res.checks) setChecks(res.checks);
+    // Merge by component id rather than replace the array — runHealthCheckAction
+    // only ever recomputes the manual config-presence checks, so replacing
+    // outright would drop the live DB-driven checks (queue depth, cron
+    // recency, webhooks — Integration Sprint 6) that aren't part of its result.
+    if (res.checks) {
+      setChecks((prev) => {
+        const byId = new Map(prev.map((c) => [c.component, c]));
+        for (const c of res.checks!) byId.set(c.component, c);
+        return Array.from(byId.values());
+      });
+    }
     startTransition(() => router.refresh());
   }
 

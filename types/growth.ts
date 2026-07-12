@@ -17,8 +17,31 @@ export interface AnalyticsDay {
   comments: number;
   shares: number;
   saves: number;
+  clicks: number;
   posts_published: number;
   created_at: string;
+}
+
+/* ── Per-post metrics (Integration Sprint 4 — real provider sync) ── */
+export interface PostAnalytics {
+  id: string;
+  user_id: string;
+  scheduled_post_id: string;
+  platform: PlatformId;
+  platform_post_id: string;
+  impressions: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  views: number;
+  clicks: number;
+  engagement_rate: number;
+  raw: Record<string, unknown>;
+  synced_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /* ── Creator Score ── */
@@ -98,7 +121,8 @@ export interface GoalInput {
 /* ── Growth recommendations (AI Growth Coach) ── */
 export type RecommendationKind =
   | "timing" | "consistency" | "format" | "platform" | "engagement_drop"
-  | "streak_risk" | "ai_usage" | "growth_win" | "goal_progress";
+  | "streak_risk" | "ai_usage" | "growth_win" | "goal_progress"
+  | "content_gap" | "audience_strategy" | "posting_frequency" | "platform_opportunity";
 export type RecommendationSeverity = "info" | "success" | "warning" | "danger";
 export type RecommendationStatus = "active" | "dismissed" | "completed";
 
@@ -115,6 +139,19 @@ export interface GrowthRecommendation {
   status: RecommendationStatus;
   created_at: string;
   updated_at: string;
+}
+
+/* ── Weekly Growth Coach reviews (Integration Sprint 5) ── */
+export interface GrowthReport {
+  id: string;
+  user_id: string;
+  period_start: string;
+  period_end: string;
+  summary: string;
+  highlights: string[];
+  daily_tasks: string[];
+  generated_at: string;
+  created_at: string;
 }
 
 /* ── Aggregated stats bundle used by score/xp/achievements/recommendations ── */

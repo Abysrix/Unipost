@@ -1,9 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { publishScheduledPost } from "@/lib/schedule/publishing";
 import { adminAwardXp } from "@/lib/db/xp";
+import { notify } from "@/lib/notifications/service";
+import { invalidateCreatorContext } from "@/lib/ai/contextCache";
 import type { ScheduledEvent, ScheduleStatus } from "@/types/schedule";
 
-async function logPublishing(admin: any, userId: string, sp: { id: string; post_id: string; platform: string }, status: string, message?: string): Promise<void> {
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+async function logPublishing(admin: AdminClient, userId: string, sp: { id: string; post_id: string; platform: string }, status: string, message?: string): Promise<void> {
   await admin.from("publishing_logs").insert({
     user_id: userId,
     scheduled_post_id: sp.id,
@@ -14,7 +18,7 @@ async function logPublishing(admin: any, userId: string, sp: { id: string; post_
   });
 }
 
-async function syncPostStatusAdmin(admin: any, postId: string): Promise<void> {
+async function syncPostStatusAdmin(admin: AdminClient, postId: string): Promise<void> {
   const { data } = await admin.from("scheduled_posts").select("status").eq("post_id", postId);
   const rows = (data ?? []) as { status: ScheduleStatus }[];
   let next: string;
@@ -51,10 +55,24 @@ export async function processScheduledQueue(): Promise<{ processed: number; succ
   let failed = 0;
 
   for (const sp of eligible) {
+    // Atomic claim: only succeeds if the row is still in a publishable
+    // status. Stops this worker run and a concurrent manual "Publish now"
+    // click (or two overlapping cron invocations) from both firing a real
+    // platform API call for the same post — the same duplicate-prevention
+    // requirement `publishNow` (lib/db/schedule.ts) enforces interactively,
+    // now needed here too now that a real background trigger exists.
+    const { data: claimed, error: claimError } = await admin
+      .from("scheduled_posts")
+      .update({ status: "publishing" })
+      .eq("id", sp.id)
+      .in("status", ["scheduled", "queued", "failed"])
+      .select("id")
+      .maybeSingle();
+    if (claimError || !claimed) continue; // lost the race (or already handled) — not this run's to process
+
     processed++;
     try {
-      // Transition state to publishing
-      await admin.from("scheduled_posts").update({ status: "publishing" }).eq("id", sp.id);
+      // Status is already "publishing" — the atomic claim above just set it.
       await logPublishing(admin, sp.user_id, sp, "publishing", "Publishing via background worker…");
 
       const result = await publishScheduledPost(sp);
@@ -69,25 +87,37 @@ export async function processScheduledQueue(): Promise<{ processed: number; succ
         }).eq("id", sp.id);
         await logPublishing(admin, sp.user_id, sp, "published", result.externalId ? `Published (${result.externalId})` : "Published");
         await syncPostStatusAdmin(admin, sp.post_id);
-        
+
         try {
           // Award XP to the creator of the post
           await adminAwardXp(sp.user_id, "post_published", `scheduled_post:${sp.id}`);
         } catch {
           /* XP is best-effort */
         }
+        // Unattended (cron-triggered) publish — the creator isn't watching the screen the way an interactive "Publish now" click implies, so this is genuinely worth surfacing. publishNow (lib/db/schedule.ts) deliberately doesn't notify on its own success for the opposite reason.
+        await notify({ userId: sp.user_id, type: "publish_success", title: "Post published", message: `Your ${sp.platform} post went out${result.externalId ? ` (${result.externalId})` : ""}.`, actionHref: "/calendar" }).catch(() => {});
+        await invalidateCreatorContext(sp.user_id).catch(() => {});
       } else {
         failed++;
-        await admin.from("scheduled_posts").update({ status: "failed", error: result.error ?? "Publishing failed", retry_count: sp.retry_count + 1 }).eq("id", sp.id);
+        const nextRetryCount = sp.retry_count + 1;
+        await admin.from("scheduled_posts").update({ status: "failed", error: result.error ?? "Publishing failed", retry_count: nextRetryCount }).eq("id", sp.id);
         await logPublishing(admin, sp.user_id, sp, "failed", result.error);
         await syncPostStatusAdmin(admin, sp.post_id);
+        // Only once retries are exhausted — an intermediate retry attempt failing isn't yet something the creator needs to act on.
+        if (nextRetryCount >= sp.max_retries) {
+          await notify({ userId: sp.user_id, type: "publish_failure", title: "Post failed to publish", message: `Your ${sp.platform} post couldn't be published after ${nextRetryCount} attempt${nextRetryCount === 1 ? "" : "s"}: ${result.error ?? "unknown error"}.`, actionHref: "/calendar", sendEmail: true }).catch(() => {});
+        }
       }
     } catch (err) {
       failed++;
       const errMsg = err instanceof Error ? err.message : "Internal worker error";
-      await admin.from("scheduled_posts").update({ status: "failed", error: errMsg, retry_count: sp.retry_count + 1 }).eq("id", sp.id);
+      const nextRetryCount = sp.retry_count + 1;
+      await admin.from("scheduled_posts").update({ status: "failed", error: errMsg, retry_count: nextRetryCount }).eq("id", sp.id);
       await logPublishing(admin, sp.user_id, sp, "failed", errMsg);
       await syncPostStatusAdmin(admin, sp.post_id);
+      if (nextRetryCount >= sp.max_retries) {
+        await notify({ userId: sp.user_id, type: "publish_failure", title: "Post failed to publish", message: `Your ${sp.platform} post couldn't be published after ${nextRetryCount} attempt${nextRetryCount === 1 ? "" : "s"}: ${errMsg}.`, actionHref: "/calendar", sendEmail: true }).catch(() => {});
+      }
     }
   }
 

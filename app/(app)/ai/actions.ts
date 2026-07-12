@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { generateText, AIError } from "@/lib/ai/gemini";
 import { buildActionPrompt, type AIActionId, type ActionInput } from "@/lib/ai/prompts";
+import { getCreatorContext } from "@/lib/ai/context";
+import { buildActionContextSummary } from "@/lib/ai/promptBuilder";
+import { inferAndUpdateMemory } from "@/lib/ai/memory";
 import * as ai from "@/lib/db/ai";
 import { awardXp } from "@/lib/db/xp";
 import { spendCredits, getCreditBalance, getOrCreateSubscription } from "@/lib/db/billing";
@@ -96,7 +99,11 @@ export async function runAction(action: AIActionId, input: ActionInput): Promise
     return { error: `You're out of AI credits (${balance} left, this needs ${cost}). Upgrade your plan or wait for your next monthly reset.` };
   }
 
-  const { system, prompt } = buildActionPrompt(action, input);
+  const { system: baseSystem, prompt } = buildActionPrompt(action, input);
+  const context = await getCreatorContext();
+  const contextSummary = buildActionContextSummary(context);
+  const system = contextSummary ? `${baseSystem}\n\nWhat you know about this specific creator: ${contextSummary}` : baseSystem;
+
   const startedAt = Date.now();
   try {
     const output = await generateText({
@@ -113,6 +120,7 @@ export async function runAction(action: AIActionId, input: ActionInput): Promise
     } catch {
       /* history + XP + credit spend are best-effort once generation succeeds */
     }
+    await inferAndUpdateMemory(user.id).catch(() => {});
     return { output };
   } catch (e) {
     const message = e instanceof AIError ? e.message : "Generation failed. Please try again.";

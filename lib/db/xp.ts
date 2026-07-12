@@ -39,10 +39,10 @@ export async function getTotalXp(): Promise<number> {
  * same way Sprint 4's `runAction` treats history writes as best-effort.
  */
 export async function awardXp(reason: XpReason, key?: string, meta: Record<string, unknown> = {}): Promise<void> {
-  const supabase = createClient();
+  const admin = createAdminClient();
   const userId = await uid();
   try {
-    const { error } = await supabase.from("xp_history").insert({
+    const { error } = await admin.from("xp_history").insert({
       user_id: userId,
       amount: XP_AWARDS[reason],
       reason,

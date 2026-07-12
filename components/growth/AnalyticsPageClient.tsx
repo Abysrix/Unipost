@@ -6,7 +6,7 @@ import { Users, Eye, Heart, Send, UserCheck, PlayCircle, Clock, Trophy, History 
 import { getPlatform } from "@/config/platforms";
 import { formatNumber } from "@/lib/utils";
 import type { Plan } from "@/lib/auth/role";
-import type { AnalyticsDay, CreatorStats } from "@/types/growth";
+import type { AnalyticsDay, CreatorStats, PostAnalytics } from "@/types/growth";
 import type { ScheduledEvent } from "@/types/schedule";
 import { dailyTotals, dailyEngagementRate, totalsByPlatform, windowSum, latestFollowersTotal, followersAsOf } from "@/lib/growth/aggregate";
 import { estimatePostPerformance, type PostPerformance } from "@/lib/growth/performance";
@@ -26,11 +26,13 @@ export default function AnalyticsPageClient({
   stats,
   analytics,
   scheduled,
+  postAnalytics,
   plan,
 }: {
   stats: CreatorStats;
   analytics: AnalyticsDay[];
   scheduled: ScheduledEvent[];
+  postAnalytics: PostAnalytics[];
   plan: Plan;
 }) {
   const maxDays = maxAnalyticsRangeDays(plan);
@@ -82,7 +84,8 @@ export default function AnalyticsPageClient({
     return Array.from(byDate.entries()).map(([date, value]) => ({ date, value }));
   }, [scheduled]);
 
-  const performance = useMemo(() => estimatePostPerformance(published, analytics), [published, analytics]);
+  const realMetricsByPost = useMemo(() => new Map(postAnalytics.map((p) => [p.scheduled_post_id, p])), [postAnalytics]);
+  const performance = useMemo(() => estimatePostPerformance(published, analytics, realMetricsByPost), [published, analytics, realMetricsByPost]);
   const topPosts = performance.slice(0, 5);
   const recent = useMemo(() => [...performance].sort((a, b) => (b.event.published_at ?? "").localeCompare(a.event.published_at ?? "")).slice(0, 5), [performance]);
 
@@ -190,6 +193,7 @@ function PerformanceRow({ p }: { p: PostPerformance }) {
         {platform?.glyph}
       </span>
       <span className="min-w-0 flex-1 truncate text-[13px] text-white/75">{title}</span>
+      {p.isReal && <span title="Real data synced from the platform" className="h-1.5 w-1.5 shrink-0 rounded-full bg-aurora-green" />}
       <span className="shrink-0 text-right font-mono text-[11px] text-white/40">
         {formatNumber(p.estimatedReach)} reach<span className="mx-1 text-white/15">·</span>{formatNumber(p.estimatedEngagement)} eng.
       </span>

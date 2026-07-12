@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { streamGemini, AIError } from "@/lib/ai/gemini";
-import { CHAT_SYSTEM } from "@/lib/ai/prompts";
+import { getCreatorContext } from "@/lib/ai/context";
+import { buildChatSystemPrompt } from "@/lib/ai/promptBuilder";
+import { inferAndUpdateMemory } from "@/lib/ai/memory";
 import { DEFAULT_MODEL, isModelId } from "@/lib/ai/models";
 import * as ai from "@/lib/db/ai";
 import { awardXp } from "@/lib/db/xp";
@@ -85,12 +87,15 @@ export async function POST(req: Request) {
     messages = [{ role: "user", content }];
   }
 
+  const context = await getCreatorContext();
+  const system = buildChatSystemPrompt(context);
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let full = "";
       try {
-        for await (const delta of streamGemini({ system: CHAT_SYSTEM, messages, model })) {
+        for await (const delta of streamGemini({ system, messages, model })) {
           full += delta;
           controller.enqueue(encoder.encode(delta));
         }
@@ -106,6 +111,7 @@ export async function POST(req: Request) {
           } catch {
             /* best-effort persistence + credit spend */
           }
+          await inferAndUpdateMemory(user.id).catch(() => {});
         }
         controller.close();
       }

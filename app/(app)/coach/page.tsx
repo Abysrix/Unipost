@@ -1,17 +1,26 @@
 import type { Metadata } from "next";
 import { Bot, Flame, Trophy, TrendingUp } from "lucide-react";
-import { requireUser } from "@/lib/auth/getUser";
-import { syncGrowth } from "@/lib/db/growth";
+import { requireUser, getCurrentUser } from "@/lib/auth/getUser";
+import { getOwnProfile } from "@/lib/db/profiles";
+import { syncGrowth, listRecommendations } from "@/lib/db/growth";
+import { getGrowthCoachBundle } from "@/lib/ai/growthCoach";
 import PageHeader from "@/components/dashboard/PageHeader";
 import GrowthCoachCard from "@/components/growth/GrowthCoachCard";
+import WeeklyReviewCard from "@/components/growth/WeeklyReviewCard";
 
 export const metadata: Metadata = { title: "Growth Coach · UniPost" };
 export const dynamic = "force-dynamic";
 
 export default async function CoachPage() {
   await requireUser();
-  const bundle = await syncGrowth();
+  const [bundle, profile, user] = await Promise.all([syncGrowth(), getOwnProfile(), getCurrentUser()]);
   const { stats, score } = bundle;
+
+  // getGrowthCoachBundle may add new AI recommendations on a regeneration
+  // run — bundle.recommendations was already fetched above, so re-read once
+  // more rather than show a page that's one load behind its own AI output.
+  const coach = user ? await getGrowthCoachBundle(user.id) : { report: null, insights: null, forecasts: [] };
+  const recommendations = user ? await listRecommendations() : bundle.recommendations;
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -23,7 +32,11 @@ export default async function CoachPage() {
         <Stat icon={TrendingUp} label="Growth (30d)" value={`${stats.followerGrowthPct30d >= 0 ? "+" : ""}${(stats.followerGrowthPct30d * 100).toFixed(1)}%`} accent="#34d399" />
       </div>
 
-      <GrowthCoachCard recommendations={bundle.recommendations} />
+      <div className="mb-6">
+        <WeeklyReviewCard report={coach.report} timezone={profile.timezone} />
+      </div>
+
+      <GrowthCoachCard recommendations={recommendations} />
     </div>
   );
 }

@@ -3,6 +3,9 @@
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { generateText } from "@/lib/ai/gemini";
 import { CHAT_SYSTEM } from "@/lib/ai/prompts";
+import { getCreatorContext } from "@/lib/ai/context";
+import { buildStudioContextSummary } from "@/lib/ai/promptBuilder";
+import { inferAndUpdateMemory } from "@/lib/ai/memory";
 import type { PlatformId } from "@/config/platforms";
 import type { PostMedia } from "@/types/post";
 
@@ -41,7 +44,11 @@ export async function analyzeMediaForPost(
     .filter(Boolean)
     .join("\n");
 
+  const creatorContext = await getCreatorContext();
+  const creatorSummary = buildStudioContextSummary(creatorContext);
+
   const prompt = `You are a viral social-media content expert specializing in ${platformList}.
+${creatorSummary ? `\nWhat you know about this specific creator: ${creatorSummary}\n` : ""}
 
 The creator has uploaded the following media:
 ${mediaList || "- (no media, text post)"}
@@ -101,6 +108,7 @@ Requirements for "content":
       return { ok: false, error: "AI returned an empty result. Please try again." };
     }
 
+    await inferAndUpdateMemory(user.id).catch(() => {});
     return { ok: true, result: { title: parsed.title || "", content: parsed.content || "" } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "AI generation failed." };

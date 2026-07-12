@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { processScheduledQueue } from "@/lib/db/admin/scheduler";
+import { withCronHistory } from "@/lib/jobs/cronRun";
 import { logger } from "@/lib/monitoring/logger";
 
 export const runtime = "nodejs";
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const summary = await processScheduledQueue();
+    const summary = await withCronHistory("publish", processScheduledQueue);
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Queue execution failed";

@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { syncScoreAndXp } from "@/lib/db/profiles";
+import { syncAllAnalytics, syncAnalyticsForPlatform as syncOnePlatform, listPostAnalytics } from "@/lib/db/analytics";
 import type { PlatformId } from "@/config/platforms";
 import type { ScheduledEvent } from "@/types/schedule";
 import { listAllPosts } from "@/lib/db/posts";
@@ -13,10 +15,9 @@ import { levelInfoFor, todayKey } from "@/lib/growth/xp";
 import { checkNewAchievements, type AchievementDef } from "@/lib/growth/achievements";
 import { currentValueFor, isGoalMet } from "@/lib/growth/goals";
 import { generateRecommendations } from "@/lib/growth/recommendations";
-import { simulatePlatformSeries, dateRange } from "@/lib/growth/simulate";
 import type {
   AnalyticsDay, CreatorScoreRow, XpEvent, UnlockedAchievement,
-  Goal, GoalInput, GoalStatus, CreatorStats, GrowthRecommendation, RecommendationStatus,
+  Goal, GoalInput, GoalStatus, CreatorStats, GrowthRecommendation, RecommendationStatus, PostAnalytics,
 } from "@/types/growth";
 
 async function uid(): Promise<string> {
@@ -29,7 +30,7 @@ const isUniqueViolation = (e: unknown) => (e as { code?: string } | null)?.code 
 
 /* ── Analytics ── */
 const ANALYTICS_COLS =
-  "id,user_id,platform,date,followers,reach,impressions,views,watch_time_min,profile_visits,likes,comments,shares,saves,posts_published,created_at";
+  "id,user_id,platform,date,followers,reach,impressions,views,watch_time_min,profile_visits,likes,comments,shares,saves,clicks,posts_published,created_at";
 
 export async function listAnalytics(days = 60): Promise<AnalyticsDay[]> {
   const supabase = createClient();
@@ -39,41 +40,25 @@ export async function listAnalytics(days = 60): Promise<AnalyticsDay[]> {
   return (data ?? []) as unknown as AnalyticsDay[];
 }
 
-/** Seed (or extend forward to today) simulated analytics for platforms the user actually uses. */
+/**
+ * Sync (or extend forward to today) analytics for platforms the user
+ * actually uses — real provider data for a genuine, healthy connection;
+ * the deterministic simulation (`lib/growth/simulate.ts`) as a fallback for
+ * platforms with no real provider built yet or a connection still in
+ * Integration Sprint 2's simulated OAuth mode. See `lib/db/analytics.ts::
+ * syncAllAnalytics` for the real/simulated routing per platform — this
+ * function is now a thin, session-resolving wrapper around it so every
+ * existing call site (below, and `syncGrowth()`) needed zero changes.
+ */
 async function ensureAnalyticsSeeded(platforms: PlatformId[], publishDatesByPlatform: Map<PlatformId, Set<string>>): Promise<void> {
   if (platforms.length === 0) return;
-  const supabase = createClient();
   const userId = await uid();
-  const todayStr = todayKey();
-
-  const rows: Record<string, unknown>[] = [];
-  for (const platform of platforms) {
-    const { data: latest, error } = await supabase
-      .from("analytics_daily")
-      .select("date,followers")
-      .eq("platform", platform)
-      .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
-
-    const last = latest as { date: string; followers: number } | null;
-    if (last?.date === todayStr) continue; // already up to date
-
-    const from = last ? new Date(new Date(`${last.date}T00:00:00Z`).getTime() + 86_400_000) : new Date(Date.now() - 89 * 86_400_000);
-    const dates = dateRange(from, new Date());
-    if (dates.length === 0) continue;
-
-    const series = simulatePlatformSeries(userId, platform, dates, publishDatesByPlatform.get(platform) ?? new Set(), last?.followers);
-    rows.push(...series.map((d) => ({ user_id: userId, ...d })));
-  }
-  if (rows.length === 0) return;
-  const { error: insErr } = await supabase.from("analytics_daily").upsert(rows, { onConflict: "user_id,platform,date" });
-  if (insErr) throw insErr;
+  await syncAllAnalytics(userId, platforms, publishDatesByPlatform);
 }
 
 export async function seedAnalyticsForPlatform(platform: PlatformId): Promise<void> {
-  await ensureAnalyticsSeeded([platform], new Map());
+  const userId = await uid();
+  await syncOnePlatform(userId, platform);
 }
 
 /* ── Creator Score ── */
@@ -122,12 +107,16 @@ export async function listUnlockedAchievements(): Promise<UnlockedAchievement[]>
 }
 
 async function syncAchievements(stats: CreatorStats, unlocked: UnlockedAchievement[]): Promise<AchievementDef[]> {
-  const supabase = createClient();
+  // achievements is a system-computed unlock ledger (migration 0017) —
+  // admin client, same reasoning as xp_history: a user directly inserting
+  // their own row here would fraudulently unlock any achievement without
+  // meeting checkNewAchievements()'s real criteria.
+  const admin = createAdminClient();
   const userId = await uid();
   const newly = checkNewAchievements(stats, unlocked.map((u) => u.achievement_id));
   if (newly.length === 0) return [];
 
-  const { error } = await supabase.from("achievements").insert(newly.map((a) => ({ user_id: userId, achievement_id: a.id })));
+  const { error } = await admin.from("achievements").insert(newly.map((a) => ({ user_id: userId, achievement_id: a.id })));
   if (error && !isUniqueViolation(error)) throw error;
   await Promise.all(newly.map((a) => awardXp("achievement_unlocked", `achievement:${a.id}`, { achievementId: a.id })));
   return newly;
@@ -246,6 +235,8 @@ export interface GrowthBundle {
   /** Raw building blocks — exposed so pages can build charts without re-fetching. */
   analytics: AnalyticsDay[];
   scheduled: ScheduledEvent[];
+  /** Real per-post metrics (Integration Sprint 4) — sparse: only posts a registered provider has actually synced have a row. */
+  postAnalytics: PostAnalytics[];
 }
 
 async function buildStats(): Promise<{ stats: CreatorStats; goals: Goal[]; analytics: AnalyticsDay[]; scheduled: ScheduledEvent[] }> {
@@ -283,11 +274,12 @@ async function buildStats(): Promise<{ stats: CreatorStats; goals: Goal[]; analy
 export async function syncGrowth(): Promise<GrowthBundle> {
   const { stats, goals, analytics, scheduled } = await buildStats();
 
-  const [score, scoreHistory, unlockedAchievements, existingRecs] = await Promise.all([
+  const [score, scoreHistory, unlockedAchievements, existingRecs, postAnalytics] = await Promise.all([
     recomputeScoreIfStale(stats),
     listScoreHistory(),
     listUnlockedAchievements(),
     listRecommendations(),
+    listPostAnalytics(),
   ]);
 
   await ensureDailyActivityXp(stats);
@@ -318,5 +310,6 @@ export async function syncGrowth(): Promise<GrowthBundle> {
     recommendations,
     analytics,
     scheduled,
+    postAnalytics,
   };
 }

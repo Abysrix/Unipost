@@ -9,6 +9,7 @@ import { listConnections } from "@/lib/db/integrations";
 import { planLimits, isUpgrade } from "@/lib/billing/plans";
 import { monthlyAllotment, currentPeriod } from "@/lib/billing/credits";
 import { createOrder, verifyPaymentSignature, type RazorpayOrder } from "@/lib/billing/razorpay";
+import { notify } from "@/lib/notifications/service";
 import type {
   Subscription, Payment, Invoice, CreditEvent, UsageSnapshot, BillingEvent, BillingEventType,
   BillingBundle, BillingCycle,
@@ -193,6 +194,7 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ ok: 
   await setPlan(userId, payment.plan).catch(() => {});
   await logEvent(userId, "payment_succeeded", `Payment captured for ${planLimits(payment.plan).name}`, { paymentId: payment.id });
   await logEvent(userId, upgrading ? "subscription_upgraded" : "subscription_downgraded", `Now on ${planLimits(payment.plan).name}`, { plan: payment.plan });
+  await notify({ userId, type: upgrading ? "subscription_upgraded" : "subscription_downgraded", title: `You're now on ${planLimits(payment.plan).name}`, message: `Your payment was captured and your plan is active.`, actionHref: "/billing", sendEmail: true }).catch(() => {});
 
   return { ok: true, error: updatedSub ? undefined : "Payment captured, but the subscription failed to update — contact support." };
 }
@@ -360,6 +362,7 @@ export async function adminConfirmPayment(payment: Payment, razorpayPaymentId: s
   await admin.from("ai_credit_history").insert({ user_id: payment.user_id, amount: monthlyAllotment(payment.plan), reason: "plan_upgrade", meta: { key: `webhook:${payment.id}` } });
   await admin.from("billing_events").insert({ user_id: payment.user_id, event_type: "payment_succeeded", message: "Confirmed via webhook", metadata: { paymentId: payment.id } });
   await setPlan(payment.user_id, payment.plan).catch(() => {});
+  await notify({ userId: payment.user_id, type: "subscription_upgraded", title: `You're now on ${planLimits(payment.plan).name}`, message: "Your payment was captured and your plan is active.", actionHref: "/billing", sendEmail: true }).catch(() => {});
 }
 
 export async function adminMarkPaymentFailed(orderId: string, reason: string): Promise<void> {
@@ -369,4 +372,5 @@ export async function adminMarkPaymentFailed(orderId: string, reason: string): P
   const row = data as { id: string; user_id: string };
   await admin.from("payments").update({ status: "failed", failure_reason: reason }).eq("id", row.id);
   await admin.from("billing_events").insert({ user_id: row.user_id, event_type: "payment_failed", message: reason, metadata: { paymentId: row.id } });
+  await notify({ userId: row.user_id, type: "payment_failed", title: "Payment failed", message: reason, actionHref: "/billing", sendEmail: true }).catch(() => {});
 }
