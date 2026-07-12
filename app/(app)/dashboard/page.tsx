@@ -50,7 +50,7 @@ export default async function DashboardPage() {
 
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
-          <AnalyticsPreview analytics={bundle.analytics} stats={bundle.stats} />
+          <AnalyticsPreview analytics={bundle.analytics} stats={bundle.stats} hasNoConnections={hasNoConnections} />
           <div className="grid gap-5 sm:grid-cols-2">
             <TodaySchedule />
             <RecentDrafts />

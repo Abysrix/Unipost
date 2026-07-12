@@ -26,11 +26,12 @@ function formatCompact(n: number): string {
 interface AnalyticsPreviewProps {
   analytics?: AnalyticsDay[];
   stats?: CreatorStats;
+  hasNoConnections?: boolean;
 }
 
 /** Analytics snapshot — live performance stats + sparkline, falls back to blurred mock-up if no connections exist. */
-export default function AnalyticsPreview({ analytics = [], stats }: AnalyticsPreviewProps) {
-  const hasNoData = analytics.length === 0;
+export default function AnalyticsPreview({ analytics = [], stats, hasNoConnections = false }: AnalyticsPreviewProps) {
+  const hasNoData = hasNoConnections || analytics.length === 0;
 
   // Real KPIs calculations
   const followersNow = latestFollowersTotal(analytics);
