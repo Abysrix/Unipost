@@ -313,14 +313,14 @@ export async function refreshUsageMetrics(): Promise<UsageSnapshot> {
 export async function getBillingBundle(): Promise<BillingBundle> {
   let subscription: Subscription | undefined;
   try { subscription = await getOrCreateSubscription(); }
-  catch (e) { console.error("Error in getOrCreateSubscription:", e); throw e; }
+  catch (e) { throw new Error(`[getOrCreateSubscription] ${e instanceof Error ? e.message : JSON.stringify(e)}`); }
 
   const [creditsRemaining, usage, payments, invoices, events] = await Promise.all([
-    getCreditBalance().catch(e => { console.error("Error in getCreditBalance:", e); throw e; }),
-    refreshUsageMetrics().catch(e => { console.error("Error in refreshUsageMetrics:", e); throw e; }),
-    listPayments().catch(e => { console.error("Error in listPayments:", e); throw e; }),
-    listInvoices().catch(e => { console.error("Error in listInvoices:", e); throw e; }),
-    listBillingEvents().catch(e => { console.error("Error in listBillingEvents:", e); throw e; }),
+    getCreditBalance().catch(e => { throw new Error(`[getCreditBalance] ${e instanceof Error ? e.message : JSON.stringify(e)}`); }),
+    refreshUsageMetrics().catch(e => { throw new Error(`[refreshUsageMetrics] ${e instanceof Error ? e.message : JSON.stringify(e)}`); }),
+    listPayments().catch(e => { throw new Error(`[listPayments] ${e instanceof Error ? e.message : JSON.stringify(e)}`); }),
+    listInvoices().catch(e => { throw new Error(`[listInvoices] ${e instanceof Error ? e.message : JSON.stringify(e)}`); }),
+    listBillingEvents().catch(e => { throw new Error(`[listBillingEvents] ${e instanceof Error ? e.message : JSON.stringify(e)}`); }),
   ]);
   return { subscription, creditsRemaining, creditsTotal: monthlyAllotment(subscription.plan), usage, payments, invoices, events };
 }
