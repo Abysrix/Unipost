@@ -21,16 +21,16 @@ export default function LoginPage({
       <OAuthButtons />
       <div className="my-5 flex items-center gap-3">
         <span className="h-px flex-1 bg-white/[0.08]" />
-        <span className="text-[10px] uppercase tracking-widest text-white/25">or</span>
+        <span className="text-[10px] uppercase tracking-widest text-white/45">or</span>
         <span className="h-px flex-1 bg-white/[0.08]" />
       </div>
       <AuthForm mode="login" redirectTo={redirectTo} />
       <p className="mt-4 text-center text-xs">
-        <Link href="/forgot-password" className="text-white/40 transition-colors hover:text-white/70">
+        <Link href="/forgot-password" className="text-white/55 transition-colors hover:text-white/70">
           Forgot your password?
         </Link>
       </p>
-      <p className="mt-3 text-center text-xs text-white/40">
+      <p className="mt-3 text-center text-xs text-white/60">
         New to UniPost?{" "}
         <Link href="/signup" className="text-aurora-teal transition-colors hover:text-aurora-green">
           Create an account

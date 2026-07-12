@@ -26,7 +26,7 @@ export default function AuthCard({
         <h1 className="font-display text-3xl font-bold text-white" style={{ letterSpacing: "-0.02em" }}>
           {title}
         </h1>
-        <p className="mt-2 text-sm text-white/45">{subtitle}</p>
+        <p className="mt-2 text-sm text-white/60">{subtitle}</p>
       </div>
 
       {errorMsg && (

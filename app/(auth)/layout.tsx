@@ -25,7 +25,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       <div className="relative z-10 w-full flex justify-center">{children}</div>
 
-      <p className="relative z-10 mt-8 text-center text-[11px] text-white/25">
+      <p className="relative z-10 mt-8 text-center text-[11px] text-white/45">
         A Bharvix product · Made in India
       </p>
     </div>

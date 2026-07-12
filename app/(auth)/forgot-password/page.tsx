@@ -9,7 +9,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthCard title="Forgot your password?" subtitle="We'll email you a link to reset it">
       <ForgotPasswordForm />
-      <p className="mt-6 text-center text-xs text-white/40">
+      <p className="mt-6 text-center text-xs text-white/60">
         Remembered it?{" "}
         <Link href="/login" className="text-aurora-teal transition-colors hover:text-aurora-green">
           Back to sign in

@@ -26,7 +26,7 @@ export function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-white/50">{label}</span>
+      <span className="text-xs font-medium text-white/65">{label}</span>
       <input
         name={name}
         type={type}
@@ -35,7 +35,7 @@ export function Field({
         required={required}
         defaultValue={defaultValue}
         maxLength={maxLength}
-        className="w-full rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none transition-colors duration-200 focus:border-aurora-teal/50 focus:bg-white/[0.05]"
+        className="w-full rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors duration-200 focus:border-aurora-teal/50 focus:bg-white/[0.05]"
       />
     </label>
   );
