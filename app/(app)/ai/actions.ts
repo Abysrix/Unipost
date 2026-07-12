@@ -13,6 +13,7 @@ import { spendCredits, getCreditBalance, getOrCreateSubscription } from "@/lib/d
 import { costForAction } from "@/lib/billing/credits";
 import { logAudit } from "@/lib/db/admin/audit";
 import { actionInputSchema, savePromptSchema } from "@/lib/validations/ai";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 
 async function guard() {
   const user = await getCurrentUser();
@@ -79,6 +80,9 @@ export type RunResult = { output: string } | { error: string };
 
 export async function runAction(action: AIActionId, input: ActionInput): Promise<RunResult> {
   const user = await guard();
+  const rateOk = await checkRateLimit("ai_action", 10, 120);
+  if (!rateOk) return { error: "Too many AI action requests. Please try again in 2 minutes." };
+
   const parsedInput = actionInputSchema.safeParse(input);
   if (!parsedInput.success) return { error: parsedInput.error.issues[0]?.message ?? "Invalid input." };
   const cost = costForAction(action);

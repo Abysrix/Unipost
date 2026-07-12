@@ -8,6 +8,7 @@ import { buildStudioContextSummary } from "@/lib/ai/promptBuilder";
 import { inferAndUpdateMemory } from "@/lib/ai/memory";
 import type { PlatformId } from "@/config/platforms";
 import type { PostMedia } from "@/types/post";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 
 export interface AIWriteResult {
   title: string;
@@ -27,6 +28,10 @@ export async function analyzeMediaForPost(
 ): Promise<{ ok: true; result: AIWriteResult } | { ok: false; error: string }> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Not authenticated." };
+
+  const rateOk = await checkRateLimit("ai_write", 10, 120);
+  if (!rateOk) return { ok: false, error: "Too many AI generation requests. Please try again in 2 minutes." };
+
   if (!process.env.API_KEY) return { ok: false, error: "AI is not configured." };
 
   const platformList = platforms.length > 0 ? platforms.join(", ").toUpperCase() : "social media";

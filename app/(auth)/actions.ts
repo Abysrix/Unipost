@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signupSchema, resetPasswordSchema } from "@/lib/validations/auth";
 import { logAudit } from "@/lib/db/admin/audit";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
@@ -20,6 +21,9 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
     password: formData.get("password"),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Invalid input" };
+
+  const rateOk = await checkRateLimit("login", 5, 300);
+  if (!rateOk) return { error: "Too many login attempts. Please try again in 5 minutes." };
 
   const supabase = createClient();
   const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
@@ -41,6 +45,9 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
     password: formData.get("password"),
   });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Invalid input" };
+
+  const rateOk = await checkRateLimit("signup", 3, 600);
+  if (!rateOk) return { error: "Too many signup attempts. Please try again in 10 minutes." };
 
   const supabase = createClient();
   const { error } = await supabase.auth.signUp({
@@ -78,6 +85,9 @@ export async function signOut(): Promise<void> {
 export async function requestPasswordReset(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const email = formData.get("email");
   if (typeof email !== "string" || !email.trim()) return { error: "Enter your email address." };
+
+  const rateOk = await checkRateLimit("reset_password", 3, 900);
+  if (!rateOk) return { error: "Too many password reset requests. Please try again in 15 minutes." };
 
   const supabase = createClient();
   await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${siteOrigin()}/auth/callback?next=/reset-password` });

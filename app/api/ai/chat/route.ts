@@ -10,6 +10,7 @@ import { spendCredits, getCreditBalance, getOrCreateSubscription } from "@/lib/d
 import { CHAT_MESSAGE_COST } from "@/lib/billing/credits";
 import { logAudit } from "@/lib/db/admin/audit";
 import { chatMessageSchema } from "@/lib/validations/ai";
+import { checkRateLimit } from "@/lib/security/rateLimit";
 import type { ChatMessage } from "@/types/ai";
 
 export const runtime = "nodejs";
@@ -23,6 +24,9 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
+
+  const rateOk = await checkRateLimit("ai_chat", 10, 60);
+  if (!rateOk) return new Response("Too many requests. Please try again in a minute.", { status: 429 });
 
   // Fail CLOSED on a transient balance-check error — failing open here would let
   // one free message through per hiccup, indefinitely, under any sustained DB issue.
