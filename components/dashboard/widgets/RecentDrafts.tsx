@@ -19,7 +19,7 @@ export default function RecentDrafts() {
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-bold" style={{ background: `${p?.color}22`, color: p?.color }}>{p?.glyph}</span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13px] text-white/70">{d.title}</div>
-                  <div className="text-[11px] text-white/30">Edited {d.edited}</div>
+                  <div className="text-[11px] text-white/50">Edited {d.edited}</div>
                 </div>
                 <PenSquare size={14} className="shrink-0 text-white/20 transition-colors group-hover:text-white/50" />
               </li>

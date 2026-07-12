@@ -21,7 +21,7 @@ export default function CreatorScorePreview({ score, level, progress }: { score:
         </div>
         <div className="flex-1">
           <div className="mb-1 flex items-center gap-2"><span className="font-display text-base font-bold text-white">Level {level}</span><span className="rounded-full bg-aurora-teal/15 px-2 py-0.5 text-[10px] text-aurora-teal">Creator</span></div>
-          <div className="mb-1.5 flex justify-between text-[11px] text-white/40"><span>XP</span><span>{xpPct}%</span></div>
+          <div className="mb-1.5 flex justify-between text-[11px] text-white/55"><span>XP</span><span>{xpPct}%</span></div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
             <div className="h-full rounded-full [background:linear-gradient(90deg,#22d3ee,#34d399,#facc15)]" style={{ width: `${xpPct}%` }} />
           </div>

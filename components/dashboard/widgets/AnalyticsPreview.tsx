@@ -96,7 +96,7 @@ export default function AnalyticsPreview({ analytics = [], stats }: AnalyticsPre
         {hasNoData && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-black/55 backdrop-blur-[3.5px] p-4 text-center">
             <p className="text-[13px] font-semibold text-white/95">Connect a social channel to view live analytics</p>
-            <p className="mt-1 text-[11px] text-white/40 max-w-[260px]">
+            <p className="mt-1 text-[11px] text-white/55 max-w-[260px]">
               Once connected, we will fetch and reflect your reach, followers, and engagement rates here.
             </p>
             <Link
@@ -114,7 +114,7 @@ export default function AnalyticsPreview({ analytics = [], stats }: AnalyticsPre
             {displayKpis.map((k) => (
               <div key={k.key}>
                 <div className="font-display text-lg font-bold text-white">{k.value}</div>
-                <div className="text-[11px] text-white/35">{k.label}</div>
+                <div className="text-[11px] text-white/50">{k.label}</div>
                 <div className={`text-[11px] ${k.up ? "text-aurora-green" : "text-red-400"}`}>
                   {k.up ? "↑" : "↓"} {k.delta}
                 </div>

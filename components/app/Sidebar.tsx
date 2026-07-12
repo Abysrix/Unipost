@@ -35,7 +35,7 @@ function SidebarContent({ user, collapsed }: { user: AppUser; collapsed: boolean
           return (
             <div key={group.title} className="mb-5">
               {!collapsed && (
-                <p className="mb-1.5 px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/25">{group.title}</p>
+                <p className="mb-1.5 px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{group.title}</p>
               )}
               <ul className="flex flex-col gap-0.5">
                 {items.map((item) => {
@@ -103,7 +103,14 @@ export default function Sidebar({ user }: { user: AppUser }) {
       </aside>
 
       {/* Mobile drawer */}
-      <div className={cn("fixed inset-0 z-[200] lg:hidden", mobileOpen ? "pointer-events-auto" : "pointer-events-none")} aria-hidden={!mobileOpen}>
+      <div 
+        className={cn("fixed inset-0 z-[200] lg:hidden", mobileOpen ? "pointer-events-auto" : "pointer-events-none")} 
+        aria-hidden={!mobileOpen}
+        style={{
+          visibility: mobileOpen ? "visible" : "hidden",
+          transition: "visibility 300ms"
+        }}
+      >
         <div
           className={cn("absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300", mobileOpen ? "opacity-100" : "opacity-0")}
           onClick={() => setMobileOpen(false)}

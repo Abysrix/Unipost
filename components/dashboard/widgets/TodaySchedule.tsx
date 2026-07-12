@@ -16,10 +16,10 @@ export default function TodaySchedule() {
             const p = getPlatform(item.platform);
             return (
               <li key={i} className="flex items-center gap-3 rounded-lg border border-white/[0.04] bg-white/[0.02] p-2.5">
-                <span className="w-10 shrink-0 font-mono text-[11px] text-white/40">{item.time}</span>
+                <span className="w-10 shrink-0 font-mono text-[11px] text-white/55">{item.time}</span>
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold" style={{ background: `${p?.color}22`, color: p?.color }}>{p?.glyph}</span>
                 <span className="min-w-0 flex-1 truncate text-[13px] text-white/70">{item.title}</span>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide ${item.status === "scheduled" ? "bg-aurora-green/15 text-aurora-green" : "bg-white/[0.06] text-white/40"}`}>{item.status}</span>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide ${item.status === "scheduled" ? "bg-aurora-green/15 text-aurora-green" : "bg-white/[0.06] text-white/55"}`}>{item.status}</span>
               </li>
             );
           })}

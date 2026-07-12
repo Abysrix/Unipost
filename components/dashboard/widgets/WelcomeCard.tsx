@@ -29,13 +29,13 @@ export default function WelcomeCard({
           <h2 className="font-display text-xl font-bold text-white md:text-2xl" style={{ letterSpacing: "-0.02em" }}>
             {greeting()}, {name} 👋
           </h2>
-          <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-white/50">
+          <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-white/65">
             <span className="flex items-center gap-1.5"><Flame size={14} className="text-orange-400" /> {summary.streak}-day streak</span>
             <span className="flex items-center gap-1.5"><CalendarClock size={14} className="text-aurora-teal" /> {summary.scheduledToday} scheduled today</span>
             
             {activeConnections.length > 0 && (
               <span className="flex items-center gap-1.5 sm:border-l sm:border-white/10 sm:pl-4">
-                <span className="text-white/40">Connected:</span>
+                <span className="text-white/55">Connected:</span>
                 <span className="flex items-center gap-1">
                   {activeConnections.map((c) => {
                     const info = getPlatform(c.platform);

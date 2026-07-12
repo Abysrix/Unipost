@@ -23,7 +23,7 @@ export default function ActivityItem({
       </span>
       <div className="min-w-0 flex-1 pt-1">
         <p className="text-[13px] leading-snug text-white/65">{children}</p>
-        <p className="mt-0.5 text-[11px] text-white/30">{time}</p>
+        <p className="mt-0.5 text-[11px] text-white/50">{time}</p>
       </div>
     </div>
   );

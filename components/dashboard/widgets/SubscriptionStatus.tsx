@@ -13,7 +13,7 @@ export default function SubscriptionStatus({ plan, creditsRemaining, creditsTota
       <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="font-display text-base font-bold text-white">{limits.name}</div>
-          <div className="text-[11px] text-white/35">{plan === "free" ? "Free forever" : "Renews monthly"}</div>
+          <div className="text-[11px] text-white/55">{plan === "free" ? "Free forever" : "Renews monthly"}</div>
         </div>
         {plan === "free" && (
           <Link href="/billing" className="rounded-full px-4 py-1.5 text-xs font-semibold text-black [background:linear-gradient(120deg,#22d3ee,#34d399,#facc15)]">Upgrade</Link>
