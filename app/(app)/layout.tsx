@@ -26,10 +26,14 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   try {
-    const user = await requireUser();
-    const profile = await getOwnProfile();
+    const [user, profile, isMaintenance, notifications] = await Promise.all([
+      requireUser(),
+      getOwnProfile(),
+      isFlagEnabled("maintenance_mode"),
+      listNotifications().catch(() => []),
+    ]);
 
-    if (profile.role !== "admin" && (await isFlagEnabled("maintenance_mode"))) {
+    if (profile.role !== "admin" && isMaintenance) {
       return <MaintenanceScreen />;
     }
 
@@ -43,7 +47,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       creatorScore: profile.creator_score,
       xp: profile.xp,
     };
-    const notifications = await listNotifications().catch(() => []);
 
     return <AppShell user={appUser} notifications={notifications}>{children}</AppShell>;
   } catch (err: any) {
