@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 
 let lenisInstance: Lenis | null = null;
@@ -16,9 +17,13 @@ export function getLenis(): Lenis | null {
  * Mounted once in AppProviders.
  */
 export function useLenis() {
+  const pathname = usePathname();
   const rafIdRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const isAuth = ["/login", "/signup", "/forgot-password", "/reset-password"].some(p => pathname?.startsWith(p));
+    if (isAuth) return;
+
     const lenis = new Lenis({
       duration: 1.6,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
