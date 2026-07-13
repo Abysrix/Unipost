@@ -30,3 +30,26 @@ UPDATE public.profiles p
 SET plan = s.plan::public.plan_type
 FROM public.subscriptions s
 WHERE p.id = s.user_id AND p.plan::text <> s.plan::text;
+
+-- 6. Redefine handle_new_user trigger function with plan_type cast to avoid runtime errors on signup
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.profiles (id, email, display_name, avatar_url, role, plan)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1)),
+    new.raw_user_meta_data ->> 'avatar_url',
+    coalesce(new.raw_app_meta_data ->> 'role', 'creator'),
+    coalesce(new.raw_app_meta_data ->> 'plan', 'free')::public.plan_type
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
