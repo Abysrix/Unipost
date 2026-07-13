@@ -10,6 +10,7 @@ import { getCurrentPlan } from "@/lib/db/plan";
 import { planLimits } from "@/lib/billing/plans";
 import { seedAnalyticsForPlatform } from "@/lib/db/growth";
 import { invalidateCreatorContext } from "@/lib/ai/contextCache";
+import { logProductEvent } from "@/lib/monitoring/productEvents";
 import type {
   ConnectedAccount, ConnectionWithPermissions, PlatformPermission,
   SyncLog, SyncType, IntegrationEvent, IntegrationEventType, ProviderProfile, ProviderTokens,
