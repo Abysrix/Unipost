@@ -3,6 +3,8 @@ import { processGrowthReportJob } from "@/lib/jobs/workers/growthReportWorker";
 import { processNotificationDeliveryJob } from "@/lib/jobs/workers/notificationWorker";
 import { processCleanupJob } from "@/lib/jobs/workers/cleanupWorker";
 import { withCorrelation } from "@/lib/monitoring/logger";
+import { persistError } from "@/lib/monitoring/errorLog";
+import { recordPerformanceSample } from "@/lib/monitoring/performance";
 
 /**
  * The generic queue's dispatcher — claims due jobs of every known type and
@@ -58,12 +60,14 @@ export async function processJobQueue(batchSize = 20): Promise<RunnerSummary> {
       const durationMs = Date.now() - startedAt;
       await completeJob(job.id, { ...result, durationMs });
       log.info(`Job completed`, { jobType: job.job_type, durationMs });
+      await recordPerformanceSample("worker_queue_time_ms", durationMs, { jobType: job.job_type }).catch(() => {});
       completed++;
     } catch (e) {
       const durationMs = Date.now() - startedAt;
       const message = e instanceof Error ? e.message : String(e);
       await failJob(job.id, message);
       log.error(e, { jobType: job.job_type, durationMs });
+      await persistError({ source: "worker_failure", error: e, userId: job.user_id, context: { jobType: job.job_type, jobId: job.id, durationMs } }).catch(() => {});
       failed++;
     }
   }

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { processAnalyticsSyncQueue } from "@/lib/db/admin/analyticsScheduler";
 import { withCronHistory } from "@/lib/jobs/cronRun";
 import { logger } from "@/lib/monitoring/logger";
+import { persistError } from "@/lib/monitoring/errorLog";
+import { recordPerformanceSample } from "@/lib/monitoring/performance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,12 +28,15 @@ export async function GET(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const startedAt = Date.now();
   try {
     const summary = await withCronHistory("analytics", processAnalyticsSyncQueue);
+    await recordPerformanceSample("analytics_sync_cron_duration_ms", Date.now() - startedAt, summary).catch(() => {});
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Analytics sync queue execution failed";
     logger.error(err, { source: "cron_analytics" });
+    await persistError({ source: "analytics_failure", error: err, context: { route: "/api/cron/analytics", durationMs: Date.now() - startedAt } }).catch(() => {});
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

@@ -1,4 +1,3 @@
-import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "./logger";
 
@@ -9,7 +8,9 @@ import { logger } from "./logger";
  * to be Client Components — a service-role DB write in that shared path
  * would pull a server-only module into the client bundle. This module is
  * only ever imported from server-side code (API routes, Server Actions,
- * workers) that already catch a specific, classifiable failure.
+ * workers) that already catch a specific, classifiable failure — same
+ * "never import into client code" discipline as lib/supabase/admin.ts
+ * itself, which this depends on directly.
  */
 
 export type ErrorSource =

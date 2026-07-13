@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { processScheduledQueue } from "@/lib/db/admin/scheduler";
 import { withCronHistory } from "@/lib/jobs/cronRun";
 import { logger } from "@/lib/monitoring/logger";
+import { persistError } from "@/lib/monitoring/errorLog";
+import { recordPerformanceSample } from "@/lib/monitoring/performance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,12 +28,15 @@ export async function GET(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const startedAt = Date.now();
   try {
     const summary = await withCronHistory("publish", processScheduledQueue);
+    await recordPerformanceSample("publish_cron_duration_ms", Date.now() - startedAt, summary).catch(() => {});
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Queue execution failed";
     logger.error(err, { source: "cron_scheduler" });
+    await persistError({ source: "publishing_failure", error: err, context: { route: "/api/cron/publish", durationMs: Date.now() - startedAt } }).catch(() => {});
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

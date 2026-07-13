@@ -8,6 +8,11 @@ import { logger } from "@/lib/monitoring/logger";
 export default function RootError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     logger.error(error, { boundary: "root", digest: error.digest });
+    fetch("/api/errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: error.message, stack: error.stack, boundary: "root", digest: error.digest, url: window.location.href }),
+    }).catch(() => {});
   }, [error]);
 
   return <ErrorState onRetry={reset} />;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { processJobQueue } from "@/lib/jobs/runner";
 import { withCronHistory } from "@/lib/jobs/cronRun";
 import { logger } from "@/lib/monitoring/logger";
+import { persistError } from "@/lib/monitoring/errorLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Job queue execution failed";
     logger.error(err, { source: "cron_jobs" });
+    await persistError({ source: "worker_failure", error: err, context: { route: "/api/cron/jobs" } }).catch(() => {});
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

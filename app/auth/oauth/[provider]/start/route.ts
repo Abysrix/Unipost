@@ -27,7 +27,10 @@ export async function GET(request: Request, { params }: { params: { provider: st
   }
   const platform = params.provider;
   const returnTo = searchParams.get("returnTo") ?? "/integrations";
-  const redirectUri = `${origin}/auth/oauth/${platform}/callback`;
+  const baseOrigin = !origin.includes("localhost") && !origin.includes("127.0.0.1")
+    ? origin.replace("http://", "https://")
+    : origin;
+  const redirectUri = `${baseOrigin}/auth/oauth/${platform}/callback`;
 
   try {
     // The verifier stays server-side in an httpOnly cookie rather than riding

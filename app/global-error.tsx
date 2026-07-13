@@ -13,6 +13,13 @@ import { logger } from "@/lib/monitoring/logger";
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     logger.error(error, { boundary: "global", digest: error.digest });
+    // Plain fetch, no app import — this boundary deliberately stays
+    // dependency-free since it only fires when the root layout itself broke.
+    fetch("/api/errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: error.message, stack: error.stack, boundary: "global", digest: error.digest, url: window.location.href }),
+    }).catch(() => {});
   }, [error]);
 
   return (

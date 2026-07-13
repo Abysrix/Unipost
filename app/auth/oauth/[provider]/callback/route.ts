@@ -7,6 +7,7 @@ import { exchangeCode } from "@/lib/integrations/oauth";
 import { completeConnection } from "@/lib/db/integrations";
 import { seedAnalyticsForPlatform } from "@/lib/db/growth";
 import { isSafeRedirect } from "@/lib/utils";
+import { persistError } from "@/lib/monitoring/errorLog";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,10 @@ export async function GET(request: Request, { params }: { params: { provider: st
   if (!user || user.id !== state.userId) return fail("session_mismatch");
 
   try {
-    const redirectUri = `${origin}/auth/oauth/${platform}/callback`;
+    const baseOrigin = !origin.includes("localhost") && !origin.includes("127.0.0.1")
+      ? origin.replace("http://", "https://")
+      : origin;
+    const redirectUri = `${baseOrigin}/auth/oauth/${platform}/callback`;
     // Set by /start as an httpOnly cookie, not carried in `state` — see that
     // route's comment. Single-use: cleared below regardless of outcome.
     const codeVerifier = cookies().get(PKCE_COOKIE)?.value;
@@ -51,6 +55,7 @@ export async function GET(request: Request, { params }: { params: { provider: st
   } catch (e) {
     cookies().delete(PKCE_COOKIE);
     const message = e instanceof Error ? e.message : "connect_failed";
+    await persistError({ source: "oauth_failure", error: e, userId: user.id, context: { platform } }).catch(() => {});
     return NextResponse.redirect(`${origin}/integrations?error=${encodeURIComponent(message)}&platform=${platform}`);
   }
 

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/getUser";
+import { logProductEvent } from "@/lib/monitoring/productEvents";
 import type { Post, PostInput } from "@/types/post";
 import type { ScheduledEvent } from "@/types/schedule";
 
@@ -58,6 +59,7 @@ export async function insertDraft(input: PostInput): Promise<Post> {
     .select(COLUMNS)
     .single();
   if (error) throw error;
+  await logProductEvent("draft_created", user.id, { postId: (data as { id: string }).id });
   return data as unknown as Post;
 }
 

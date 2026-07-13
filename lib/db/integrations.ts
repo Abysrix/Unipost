@@ -209,6 +209,7 @@ export async function completeConnection(platform: PlatformId, profile: Provider
   await logEvent(userId, platform, isReconnect ? "reconnected" : "connected", account.id, `${isReconnect ? "Reconnected" : "Connected"} ${profile.displayName}`);
   await seedAnalyticsForPlatform(platform).catch(() => {});
   await invalidateCreatorContext(userId).catch(() => {});
+  if (!isReconnect) await logProductEvent("account_connected", userId, { platform });
 
   return account;
 }

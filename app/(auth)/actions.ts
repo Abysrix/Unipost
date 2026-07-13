@@ -8,6 +8,7 @@ import { loginSchema, signupSchema, resetPasswordSchema } from "@/lib/validation
 import { logAudit } from "@/lib/db/admin/audit";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { isSafeRedirect } from "@/lib/utils";
+import { logProductEvent } from "@/lib/monitoring/productEvents";
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
@@ -51,7 +52,7 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   if (!rateOk) return { error: "Too many signup attempts. Please try again in 10 minutes." };
 
   const supabase = createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
@@ -60,6 +61,7 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
     },
   });
   if (error) return { error: error.message };
+  if (data.user) await logProductEvent("signup_completed", data.user.id).catch(() => {});
 
   return { message: "Almost there — check your inbox to confirm your account." };
 }

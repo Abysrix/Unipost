@@ -2,6 +2,7 @@ import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSafeRedirect } from "@/lib/utils";
+import { logProductEvent } from "@/lib/monitoring/productEvents";
 
 /**
  * Email confirmation / magic-link verification — verifies the OTP token_hash
@@ -23,8 +24,13 @@ export async function GET(request: Request) {
   }
 
   if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash });
-    if (!error) return NextResponse.redirect(`${origin}${redirectTo}`);
+    const { data, error } = await supabase.auth.verifyOtp({ type, token_hash });
+    if (!error) {
+      if ((type === "signup" || type === "email") && data.user) {
+        await logProductEvent("email_verified", data.user.id);
+      }
+      return NextResponse.redirect(`${origin}${redirectTo}`);
+    }
   }
 
   return NextResponse.redirect(`${origin}/login?error=confirm`);
