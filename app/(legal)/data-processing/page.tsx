@@ -22,8 +22,8 @@ export default function DataProcessingPage() {
 
       <p className="mb-10 leading-relaxed">
         This notice supplements our <a href="/privacy" className="text-aurora-teal hover:underline">Privacy Policy</a> with
-        the technical detail expected of a "data fiduciary" under India's Digital Personal Data Protection
-        Act, 2023 ("DPDP Act") — who processes your data, why, and who you can contact about it.
+        the technical detail expected of a “data fiduciary” under India’s Digital Personal Data Protection
+        Act, 2023 (“DPDP Act”) — who processes your data, why, and who you can contact about it.
       </p>
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">Data fiduciary</h2>
@@ -37,7 +37,7 @@ export default function DataProcessingPage() {
         <li>Account credentials — password hash, OAuth tokens for connected platforms (encrypted at rest).</li>
         <li>Content data — posts, captions, media, AI conversation history.</li>
         <li>Usage data — feature usage, AI generations, publishing activity, in-app events.</li>
-        <li>Analytics data — engagement metrics synced from your connected platforms' own APIs.</li>
+        <li>Analytics data — engagement metrics synced from your connected platforms’ own APIs.</li>
         <li>Billing data — subscription status, payment history (not full card/UPI details, which Razorpay holds directly).</li>
       </ul>
 
@@ -73,12 +73,12 @@ export default function DataProcessingPage() {
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">Retention</h2>
       <p className="mb-4 leading-relaxed">
         Retained for as long as your account is active, and deleted within 30 days of account deletion,
-        except billing records we're legally required to retain longer under Indian tax law.
+        except billing records we’re legally required to retain longer under Indian tax law.
       </p>
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">Cross-border transfer</h2>
       <p className="mb-4 leading-relaxed">
-        Some sub-processors above may process data outside India. We rely on each provider's own
+        Some sub-processors above may process data outside India. We rely on each provider’s own
         contractual and technical safeguards for cross-border transfer, consistent with the DPDP Act.
       </p>
 

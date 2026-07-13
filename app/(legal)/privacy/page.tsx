@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
       <p className="mb-10 text-sm text-white/40">Effective {EFFECTIVE_DATE} · Private Beta</p>
 
       <p className="mb-4 leading-relaxed">
-        UniPost ("UniPost," "we," "us," "our") is a product of Bharvix. This Privacy Policy explains what
+        UniPost (“UniPost,” “we,” “us,” “our”) is a product of Bharvix. This Privacy Policy explains what
         personal data we collect when you use UniPost (currently in private beta), why we collect it, how
         we use and protect it, and the choices and rights you have. By creating a UniPost account, you
         agree to the collection and use of information as described here.
@@ -40,13 +40,13 @@ export default function PrivacyPolicyPage() {
       <h3 className="mb-2 mt-6 text-[15px] font-semibold text-white/90">Content you create</h3>
       <p className="mb-4 leading-relaxed">
         Post drafts, captions, uploaded media (images/video), and any content you generate or edit using
-        UniPost's AI tools.
+        UniPost’s AI tools.
       </p>
       <h3 className="mb-2 mt-6 text-[15px] font-semibold text-white/90">Usage and analytics data</h3>
       <p className="mb-4 leading-relaxed">
         How you use UniPost — pages visited, features used, AI generations run, posts scheduled/published —
         so we can operate, secure, and improve the product during the beta. We also sync engagement metrics
-        (reach, likes, comments, follower counts) from your connected platforms' own analytics APIs so we
+        (reach, likes, comments, follower counts) from your connected platforms’ own analytics APIs so we
         can show you your own performance data.
       </p>
       <h3 className="mb-2 mt-6 text-[15px] font-semibold text-white/90">Payment information</h3>
@@ -61,18 +61,18 @@ export default function PrivacyPolicyPage() {
         <li>To provide the core service — scheduling, publishing, and reading analytics for your connected accounts.</li>
         <li>To generate AI content and recommendations personalized to your own posting history and performance (see Section 3).</li>
         <li>To process payments and manage your subscription.</li>
-        <li>To send you transactional emails (publish confirmations, billing receipts, security alerts) and, where you've opted in, product updates.</li>
+        <li>To send you transactional emails (publish confirmations, billing receipts, security alerts) and, where you’ve opted in, product updates.</li>
         <li>To detect abuse, enforce our Terms of Service, and keep the platform secure.</li>
-        <li>To improve UniPost — during the beta specifically, to understand which features work and which don't.</li>
+        <li>To improve UniPost — during the beta specifically, to understand which features work and which don’t.</li>
       </ul>
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">3. AI processing</h2>
       <p className="mb-4 leading-relaxed">
-        UniPost's AI features (caption generation, the Smart Editor, the AI Growth Coach) are powered by
+        UniPost’s AI features (caption generation, the Smart Editor, the AI Growth Coach) are powered by
         third-party language models accessed via OpenRouter. When you use an AI feature, we send the
         model a purpose-built summary of relevant context — for example, your recent post performance or
         inferred writing style — never your raw analytics data or full post history verbatim. We do not
-        use your content to train third-party foundation models, and OpenRouter's own data-use terms
+        use your content to train third-party foundation models, and OpenRouter’s own data-use terms
         govern how it and its upstream model providers handle request data in transit.
       </p>
 
@@ -94,13 +94,13 @@ export default function PrivacyPolicyPage() {
       <p className="mb-4 leading-relaxed">
         We retain your account and content data for as long as your account is active. If you delete your
         account (Settings → Delete Account), we permanently delete your profile, posts, connected-account
-        tokens, and personal data within 30 days, except where we're legally required to retain records
+        tokens, and personal data within 30 days, except where we’re legally required to retain records
         longer (e.g., payment records for tax/accounting purposes under Indian law).
       </p>
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">6. Your rights</h2>
       <p className="mb-4 leading-relaxed">
-        Under India's Digital Personal Data Protection Act, 2023, and as a matter of policy for all users
+        Under India’s Digital Personal Data Protection Act, 2023, and as a matter of policy for all users
         regardless of location, you have the right to:
       </p>
       <ul className="mb-4 ml-5 list-disc space-y-2 leading-relaxed marker:text-white/25">
@@ -123,12 +123,12 @@ export default function PrivacyPolicyPage() {
         Social account tokens are encrypted at rest (AES-256-GCM). All data in transit is encrypted via
         TLS. Access to your data is enforced at the database level via row-level security, so your data is
         only ever readable by your own authenticated session or by our service infrastructure acting on
-        your behalf. No system is perfectly secure, and we can't guarantee absolute security, but we take
+        your behalf. No system is perfectly secure, and we can’t guarantee absolute security, but we take
         reasonable, industry-standard measures to protect your data and will notify you if we become aware
         of a breach affecting your account.
       </p>
 
-      <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">9. Children's privacy</h2>
+      <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">9. Children’s privacy</h2>
       <p className="mb-4 leading-relaxed">
         UniPost is not directed at children under 18. We do not knowingly collect data from anyone under 18.
       </p>
@@ -141,7 +141,7 @@ export default function PrivacyPolicyPage() {
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">11. Changes to this policy</h2>
       <p className="mb-4 leading-relaxed">
-        We'll update the effective date above when this policy changes, and for material changes, notify
+        We’ll update the effective date above when this policy changes, and for material changes, notify
         you by email or in-app before they take effect.
       </p>
 

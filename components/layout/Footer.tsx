@@ -7,6 +7,13 @@ import { footerNav, siteConfig } from "@/config/site";
 
 const LETTERS = "UNIPOST".split("");
 
+const LEGAL_LINKS = [
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
+  { label: "Cookies", href: "/cookies" },
+  { label: "Refund Policy", href: "/refund" },
+];
+
 function KineticLetter({ char, index, mx, my }: { char: string; index: number; mx: MotionValue<number>; my: MotionValue<number> }) {
   const depth = 6 + (index % 3) * 7;
   const dir = index % 2 === 0 ? 1 : -1;
@@ -100,6 +107,13 @@ export default function Footer() {
 
         <div className="flex flex-col items-center justify-between gap-4 py-6 md:flex-row">
           <p className="text-xs text-white/15">© {new Date().getFullYear()} UniPost — a Bharvix product.</p>
+          <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
+            {LEGAL_LINKS.map((link) => (
+              <a key={link.href} href={link.href} className="text-[11px] text-white/25 transition-colors hover:text-white/60">
+                {link.label}
+              </a>
+            ))}
+          </nav>
           <p className="font-mono text-[11px] text-white/10">Made in India ✦ For creators</p>
         </div>
       </div>

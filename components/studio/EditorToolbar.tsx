@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Smile, Hash, Image as ImageIcon, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Smile, Hash, Image as ImageIcon } from "lucide-react";
 
 const EMOJIS = ["😀", "😅", "🔥", "🚀", "✨", "💡", "🎯", "📈", "🙌", "👀", "❤️", "🎉", "💬", "✅", "⚡", "🧵"];
 
-/** Editor toolbar — emoji picker + hashtag insert + media shortcut. AI is a
- *  disabled placeholder (wired in a later sprint). */
+/**
+ * Editor toolbar — emoji picker + hashtag insert + media shortcut. AI writing
+ * lives in AIWriteButton/AISelectionMenu (highlight-to-Ask-AI) elsewhere on
+ * this same screen — a disabled Sparkles button here that used to say "AI
+ * writing — coming in a later sprint" was stale now that it's real, and
+ * confusingly contradicted the working AI features right next to it.
+ */
 export default function EditorToolbar({
   onInsert,
   onAddMedia,
@@ -53,12 +57,6 @@ export default function EditorToolbar({
           <ImageIcon size={16} />
         </button>
       )}
-
-      <div className="mx-1 h-4 w-px bg-white/10" />
-
-      <button type="button" disabled className={cn(btn, "cursor-not-allowed opacity-40")} title="AI writing — coming in a later sprint">
-        <Sparkles size={16} />
-      </button>
     </div>
   );
 }

@@ -10,7 +10,13 @@ import { updateSession } from "@/lib/supabase/middleware";
  * `/api/*` is deliberately out of scope — routes there self-authenticate
  * (session check inside the handler, or a signature check for webhooks).
  */
-const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/reset-password"]);
+const PUBLIC_PATHS = new Set([
+  "/", "/login", "/signup", "/forgot-password", "/reset-password",
+  // Legal pages (LaunchOps Phase 1) — must be reachable by anyone, signed in
+  // or not; route groups like (legal) don't affect the URL or this allow-list,
+  // so these need their own explicit entries the same as every public page.
+  "/privacy", "/terms", "/cookies", "/refund", "/data-processing",
+]);
 /** Auth routes an authenticated user should be redirected away from. */
 const AUTH_ROUTES = ["/login", "/signup"];
 

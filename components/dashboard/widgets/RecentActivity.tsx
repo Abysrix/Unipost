@@ -1,30 +1,38 @@
-import { Activity, TrendingUp, Send, Sparkles, CalendarClock } from "lucide-react";
+import { Activity, TrendingUp, Send, AlertTriangle, CreditCard } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import WidgetContainer from "../WidgetContainer";
 import ActivityItem from "../ActivityItem";
 import EmptyState from "../EmptyState";
-import { activity } from "@/lib/mock/dashboard";
+import { timeAgo } from "@/lib/utils";
+import type { Notification, NotificationType } from "@/lib/notifications/service";
 
-const iconFor: Record<string, { icon: LucideIcon; accent: string }> = {
-  milestone: { icon: TrendingUp, accent: "#facc15" },
-  publish: { icon: Send, accent: "#34d399" },
-  ai: { icon: Sparkles, accent: "#22d3ee" },
-  schedule: { icon: CalendarClock, accent: "#2dd4bf" },
+// Same event taxonomy NotificationBell (Topbar) renders — reusing the real
+// notifications feed here instead of a separate "activity" concept, since
+// that's exactly what this widget's own name describes and this app already
+// writes a real row for every event worth telling a creator about.
+const ICON_FOR: Record<NotificationType, { icon: LucideIcon; accent: string }> = {
+  publish_success: { icon: Send, accent: "#34d399" },
+  publish_failure: { icon: AlertTriangle, accent: "#f87171" },
+  analytics_ready: { icon: TrendingUp, accent: "#facc15" },
+  subscription_upgraded: { icon: CreditCard, accent: "#22d3ee" },
+  subscription_downgraded: { icon: CreditCard, accent: "#22d3ee" },
+  payment_failed: { icon: AlertTriangle, accent: "#f87171" },
+  system_alert: { icon: AlertTriangle, accent: "#facc15" },
 };
 
-/** Recent activity feed. */
-export default function RecentActivity() {
+/** Recent activity feed — the creator's own real recent notifications. */
+export default function RecentActivity({ notifications }: { notifications: Notification[] }) {
   return (
     <WidgetContainer title="Recent Activity" icon={Activity}>
-      {activity.length === 0 ? (
+      {notifications.length === 0 ? (
         <EmptyState compact icon={Activity} title="No activity yet" description="Publish or schedule a post to get started." />
       ) : (
         <div>
-          {activity.map((a, i) => {
-            const meta = iconFor[a.kind] ?? { icon: Activity, accent: "#2dd4bf" };
+          {notifications.map((n, i) => {
+            const meta = ICON_FOR[n.type] ?? { icon: Activity, accent: "#2dd4bf" };
             return (
-              <ActivityItem key={i} icon={meta.icon} accent={meta.accent} time={a.time} last={i === activity.length - 1}>
-                {a.text}
+              <ActivityItem key={n.id} icon={meta.icon} accent={meta.accent} time={timeAgo(n.created_at)} last={i === notifications.length - 1}>
+                {n.title}
               </ActivityItem>
             );
           })}

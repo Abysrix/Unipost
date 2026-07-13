@@ -7,7 +7,7 @@ const EFFECTIVE_DATE = "13 July 2026";
 const COOKIE_TABLE = [
   { name: "sb-access-token / sb-refresh-token", purpose: "Keeps you signed in", type: "Essential", expiry: "Session / 1 year" },
   { name: "unipost_pkce_verifier", purpose: "Secures the social-account connection flow (OAuth PKCE)", type: "Essential", expiry: "10 minutes" },
-  { name: "unipost_cookie_consent", purpose: "Remembers your cookie preference so we don't ask again", type: "Essential", expiry: "1 year" },
+  { name: "unipost_cookie_consent", purpose: "Remembers your cookie preference so we don’t ask again", type: "Essential", expiry: "1 year" },
 ];
 
 export default function CookiePolicyPage() {
@@ -18,7 +18,7 @@ export default function CookiePolicyPage() {
       <p className="mb-10 text-sm text-white/40">Effective {EFFECTIVE_DATE}</p>
 
       <p className="mb-4 leading-relaxed">
-        This Cookie Policy explains what cookies UniPost uses and why. It's part of our{" "}
+        This Cookie Policy explains what cookies UniPost uses and why. It’s part of our{" "}
         <a href="/privacy" className="text-aurora-teal hover:underline">Privacy Policy</a>.
       </p>
 
@@ -29,9 +29,9 @@ export default function CookiePolicyPage() {
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">Cookies we use</h2>
       <p className="mb-4 leading-relaxed">
-        UniPost keeps this deliberately minimal — we don't run third-party advertising or cross-site
+        UniPost keeps this deliberately minimal — we don’t run third-party advertising or cross-site
         tracking cookies. Every cookie below is <strong className="text-white/85">essential</strong> to
-        signing in and using the product; there's currently no optional/analytics cookie to opt out of.
+        signing in and using the product; there’s currently no optional/analytics cookie to opt out of.
       </p>
 
       <div className="mb-6 overflow-x-auto rounded-xl border border-white/[0.08]">
@@ -72,7 +72,7 @@ export default function CookiePolicyPage() {
       </p>
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">Changes</h2>
-      <p className="mb-4 leading-relaxed">We'll update the effective date above if this policy changes.</p>
+      <p className="mb-4 leading-relaxed">We’ll update the effective date above if this policy changes.</p>
 
       <h2 className="mb-3 mt-10 font-display text-xl font-bold text-white">Contact</h2>
       <p className="mb-4 leading-relaxed">

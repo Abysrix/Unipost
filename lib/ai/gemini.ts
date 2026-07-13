@@ -18,7 +18,12 @@ export class AIError extends Error {
 
 function apiKey(): string {
   const key = process.env.API_KEY;
-  if (!key) throw new AIError("AI is not configured — add API_KEY to your environment.", 503);
+  // This message reaches end users as-is (every AIError call site streams or
+  // returns e.message directly) — it must never read like a setup
+  // instruction aimed at a developer. The real "API_KEY env var" detail
+  // still goes to the server log via the catch blocks that log AIError
+  // separately (e.g. logAudit("api_error", ...)).
+  if (!key) throw new AIError("AI features aren't available right now. We're on it — please try again shortly, or contact support if this continues.", 503);
   return key;
 }
 

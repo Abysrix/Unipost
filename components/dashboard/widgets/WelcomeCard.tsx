@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { PenSquare, Flame, CalendarClock } from "lucide-react";
-import { summary } from "@/lib/mock/dashboard";
 import type { ConnectionWithPermissions } from "@/types/integrations";
 import { getPlatform } from "@/config/platforms";
 
@@ -15,9 +14,15 @@ function greeting(): string {
 export default function WelcomeCard({
   name,
   connections = [],
+  streak,
+  scheduledToday,
 }: {
   name: string;
   connections?: ConnectionWithPermissions[];
+  /** Real current posting streak (lib/growth/stats.ts::currentStreak) — 0 for a brand-new account, not a placeholder. */
+  streak: number;
+  /** Real count of today's scheduled_posts rows. */
+  scheduledToday: number;
 }) {
   const activeConnections = connections.filter((c) => c.status === "connected");
 
@@ -30,8 +35,8 @@ export default function WelcomeCard({
             {greeting()}, {name} 👋
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-white/65">
-            <span className="flex items-center gap-1.5"><Flame size={14} className="text-orange-400" /> {summary.streak}-day streak</span>
-            <span className="flex items-center gap-1.5"><CalendarClock size={14} className="text-aurora-teal" /> {summary.scheduledToday} scheduled today</span>
+            <span className="flex items-center gap-1.5"><Flame size={14} className="text-orange-400" /> {streak}-day streak</span>
+            <span className="flex items-center gap-1.5"><CalendarClock size={14} className="text-aurora-teal" /> {scheduledToday} scheduled today</span>
             
             {activeConnections.length > 0 && (
               <span className="flex items-center gap-1.5 sm:border-l sm:border-white/10 sm:pl-4">

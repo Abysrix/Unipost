@@ -5,6 +5,9 @@ import { getCreditBalance } from "@/lib/db/billing";
 import { monthlyAllotment } from "@/lib/billing/credits";
 import { listConnections } from "@/lib/db/integrations";
 import { syncGrowth } from "@/lib/db/growth";
+import { listEvents } from "@/lib/db/schedule";
+import { listDrafts } from "@/lib/db/posts";
+import { listNotifications } from "@/lib/notifications/service";
 import InfoBanner from "@/components/dashboard/InfoBanner";
 import WelcomeCard from "@/components/dashboard/widgets/WelcomeCard";
 import QuickActions from "@/components/dashboard/widgets/QuickActions";
@@ -18,18 +21,31 @@ import SubscriptionStatus from "@/components/dashboard/widgets/SubscriptionStatu
 
 export const metadata: Metadata = { title: "Dashboard · UniPost" };
 
+function todayRangeIso(): { start: string; end: string } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 export default async function DashboardPage() {
   await requireUser();
-  const [profile, creditsRemaining, connections, bundle] = await Promise.all([
+  const { start: todayStart, end: todayEnd } = todayRangeIso();
+  const [profile, creditsRemaining, connections, bundle, todayEvents, drafts, notifications] = await Promise.all([
     getOwnProfile(),
     getCreditBalance().catch(() => 0),
     listConnections(),
     syncGrowth(),
+    listEvents(todayStart, todayEnd).catch(() => []),
+    listDrafts().catch(() => []),
+    listNotifications(5).catch(() => []),
   ]);
   const name = profile.display_name || profile.email.split("@")[0];
   const plan = profile.plan;
 
   const hasNoConnections = connections.length === 0;
+  const recentDrafts = drafts.filter((p) => p.status === "draft").slice(0, 5);
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -42,7 +58,7 @@ export default async function DashboardPage() {
         />
       )}
 
-      <WelcomeCard name={name} connections={connections} />
+      <WelcomeCard name={name} connections={connections} streak={bundle.stats.currentStreak} scheduledToday={todayEvents.length} />
 
       <div className="mt-6">
         <QuickActions />
@@ -52,10 +68,10 @@ export default async function DashboardPage() {
         <div className="space-y-5 lg:col-span-2">
           <AnalyticsPreview analytics={bundle.analytics} stats={bundle.stats} hasNoConnections={hasNoConnections} />
           <div className="grid gap-5 sm:grid-cols-2">
-            <TodaySchedule />
-            <RecentDrafts />
+            <TodaySchedule events={todayEvents} />
+            <RecentDrafts drafts={recentDrafts} />
           </div>
-          <RecentActivity />
+          <RecentActivity notifications={notifications} />
         </div>
         <div className="space-y-5">
           <CreatorScorePreview score={bundle.score.score} level={bundle.level.level} progress={bundle.level.progress} />
