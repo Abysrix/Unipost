@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signupSchema, resetPasswordSchema } from "@/lib/validations/auth";
 import { logAudit } from "@/lib/db/admin/audit";
 import { checkRateLimit } from "@/lib/security/rateLimit";
+import { isSafeRedirect } from "@/lib/utils";
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
@@ -119,6 +120,5 @@ export async function updatePassword(_prev: AuthState, formData: FormData): Prom
 /** Safe post-login redirect target (defaults to /dashboard). */
 function formDataRedirect(formData: FormData): string {
   const raw = formData.get("redirect");
-  if (typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//")) return raw;
-  return "/dashboard";
+  return isSafeRedirect(raw) ? raw : "/dashboard";
 }

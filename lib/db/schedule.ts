@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import type { PlatformId } from "@/config/platforms";
 import type { ScheduledEvent, ScheduledPost, ScheduleStatus } from "@/types/schedule";
-import { publishScheduledPost } from "@/lib/schedule/publishing";
+import { publishScheduledPost, NON_RETRYABLE_ERRORS } from "@/lib/schedule/publishing";
 import { getDefaultAccountId } from "@/lib/db/integrations";
 import { awardXp } from "@/lib/db/xp";
 import { getCurrentPlan } from "@/lib/db/plan";
@@ -193,8 +193,16 @@ export async function retrySchedule(id: string): Promise<void> {
     throw new Error(`Retry limit reached (${retry_count}/${max_retries}). Edit and reschedule this post instead.`);
   }
 
-  const { data, error } = await supabase.from("scheduled_posts").update({ status: "queued", error: null }).eq("id", id).select("id,post_id,platform").single();
+  // Guard on status="failed" the same way publishNow's own claim-lock guards
+  // its transition — retry_count/max_retries above were read fresh, but
+  // without this the write itself doesn't re-verify the row is still
+  // "failed": a stale client (this row published or started publishing in
+  // the background between that read and this write) could otherwise revert
+  // an already-published row back to "queued", which cron would then
+  // legitimately re-claim and publish a second time for real.
+  const { data, error } = await supabase.from("scheduled_posts").update({ status: "queued", error: null }).eq("id", id).eq("status", "failed").select("id,post_id,platform").maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("This post is no longer in a failed state — refresh and try again.");
   const sp = data as { id: string; post_id: string; platform: string };
   await log(userId, sp, "queued", "Re-queued for retry");
 }
@@ -267,12 +275,19 @@ export async function publishNow(id: string): Promise<{ ok: boolean; error?: str
   const result = await publishScheduledPost(sp);
 
   if (result.ok) {
-    await supabase.from("scheduled_posts").update({
+    // The platform publish already happened — a failure to persist that here
+    // must not be swallowed, or the row is left stuck at "publishing" forever
+    // (live on the platform, invisible to retry, no failure notification).
+    const { error: publishedError } = await supabase.from("scheduled_posts").update({
       status: "published",
       published_at: new Date().toISOString(),
       platform_post_id: result.externalId ?? null,
       error: null,
     }).eq("id", id);
+    if (publishedError) {
+      await log(userId, sp, "failed", `Published on ${sp.platform} but failed to record it: ${publishedError.message}`, { platformPostId: result.externalId });
+      return { ok: false, error: `Published, but failed to save the result — refresh and check ${sp.platform} directly.` };
+    }
     await log(userId, sp, "published", result.externalId ? `Published (${result.externalId})` : "Published", result.responseMeta);
     await syncPostStatus(sp.post_id);
     try {
@@ -284,7 +299,15 @@ export async function publishNow(id: string): Promise<{ ok: boolean; error?: str
     return { ok: true };
   }
 
-  await supabase.from("scheduled_posts").update({ status: "failed", error: result.error ?? "Publishing failed", retry_count: sp.retry_count + 1 }).eq("id", id);
-  await log(userId, sp, "failed", result.error, { errorCode: result.errorCode, ...(result.responseMeta ?? {}) });
+  // A non-retryable error (no connection, expired token, oversized media, ...)
+  // describes a state a blind retry can't fix — jump straight to the retry
+  // limit instead of burning it down one doomed attempt at a time, so the
+  // user is told to reconnect/fix the post immediately rather than after
+  // max_retries identical failures.
+  const nonRetryable = result.errorCode ? NON_RETRYABLE_ERRORS.has(result.errorCode) : false;
+  const nextRetryCount = nonRetryable ? Math.max(sp.retry_count + 1, sp.max_retries) : sp.retry_count + 1;
+  const { error: failedError } = await supabase.from("scheduled_posts").update({ status: "failed", error: result.error ?? "Publishing failed", retry_count: nextRetryCount }).eq("id", id);
+  if (failedError) await log(userId, sp, "failed", `Publish failed, and failed to record the failure: ${failedError.message}`, { errorCode: result.errorCode });
+  else await log(userId, sp, "failed", result.error, { errorCode: result.errorCode, ...(result.responseMeta ?? {}) });
   return { ok: false, error: result.error };
 }

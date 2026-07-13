@@ -61,7 +61,6 @@ export interface OAuthState {
   /** Where to send the user back to in the app after connecting. */
   returnTo: string;
   iat: number;
-  codeVerifier?: string;
 }
 
 /** Sign a state payload → opaque token to round-trip through the OAuth redirect. */

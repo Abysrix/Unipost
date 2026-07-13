@@ -50,6 +50,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
     return <AppShell user={appUser} notifications={notifications}>{children}</AppShell>;
   } catch (err: any) {
+    // requireUser()'s own redirect("/login") throws a special Next.js control-flow
+    // "error" (digest "NEXT_REDIRECT...") to signal the framework, not a real
+    // failure — a session that's valid at middleware time but expired by the time
+    // this layout runs is exactly when this fires. Swallowing it here (this catch
+    // previously had no such check) showed a raw "Database Permission Error"
+    // screen instead of the clean redirect to /login. Must rethrow, not render.
+    if (typeof err?.digest === "string" && err.digest.startsWith("NEXT_REDIRECT")) throw err;
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#09090b] p-6 text-white">
         <div className="w-full max-w-md rounded-2xl border border-red-500/20 bg-red-500/[0.05] p-6 font-mono text-xs">

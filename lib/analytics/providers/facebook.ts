@@ -15,6 +15,16 @@ import { resolveAuthForPlatform, fetchJson, listManagedPages, deriveEngagement, 
  * way to get exact counts; Insights' `post_reactions_by_type_total` exists
  * too but is meant for reaction-type breakdowns, not a simpler source of
  * truth for a single total.
+ *
+ * `page_impressions`/`page_fans` deprecated Nov 15, 2025 (replacements:
+ * `page_media_view`/`page_follows`); `page_engaged_users`/`page_views_total`
+ * (this file's own reach/profile-visits proxies) deprecated even earlier,
+ * Mar 14, 2024, with no documented replacement at all. Same for
+ * `post_engaged_users`/`post_clicks` at the post level. Dropped rather than
+ * guessed at — this codebase's "never fabricate, report what's real" rule.
+ * `page_fans`/followers still has a solid fallback regardless: the
+ * always-real-time `/{pageId}?fields=followers_count` call a few lines
+ * below never depended on the Insights time series to begin with.
  */
 
 const GRAPH = "https://graph.facebook.com/v19.0";
@@ -50,17 +60,18 @@ async function fetchAccountMetricsInternal(pageId: string, pageToken: string, si
   const until = Math.floor(Date.now() / 1000);
   const byDate = new Map<string, NormalizedDailyMetrics>();
 
-  const res = await fetchJson(`${GRAPH}/${pageId}/insights?metric=page_impressions,page_engaged_users,page_fans,page_views_total&period=day&since=${since}&until=${until}&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" });
+  // page_engaged_users/page_views_total dropped — deprecated Mar 2024 with no
+  // documented replacement (see file header), so reach/profile_visits are
+  // left at their default 0 from this call rather than guessed at.
+  const res = await fetchJson(`${GRAPH}/${pageId}/insights?metric=page_media_view,page_follows&period=day&since=${since}&until=${until}&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" });
   if (res.ok) {
     const metrics = (res.data as { data?: InsightMetric[] } | null)?.data ?? [];
     for (const metric of metrics) {
       for (const point of metric.values) {
         const date = point.end_time.slice(0, 10);
         const row = byDate.get(date) ?? blankRow(date);
-        if (metric.name === "page_impressions") row.impressions = point.value;
-        else if (metric.name === "page_engaged_users") row.reach = point.value; // page_engaged_users approximates reach-driving activity; Meta retired the direct "page_impressions_unique"/reach metric for many Page categories.
-        else if (metric.name === "page_fans") row.followers = point.value;
-        else if (metric.name === "page_views_total") row.profile_visits = point.value;
+        if (metric.name === "page_media_view") row.impressions = point.value;
+        else if (metric.name === "page_follows") row.followers = point.value;
         byDate.set(date, row);
       }
     }
@@ -83,9 +94,17 @@ async function fetchAccountMetricsInternal(pageId: string, pageToken: string, si
 }
 
 async function fetchPostMetricsInternal(pageToken: string, postId: string): Promise<ProviderResult<NormalizedPostMetrics>> {
+  // post_engaged_users/post_clicks dropped, same as their page-level
+  // equivalents (no documented replacement). post_media_view is this file's
+  // best-effort analogy to page_impressions -> page_media_view — Meta's own
+  // deprecated-metrics doc only covered Page-level names directly, so this
+  // one specific mapping is an educated guess, not confirmed; if wrong,
+  // `insightsRes.ok` below simply stays false and impressions stays 0 same
+  // as dropping it outright would — likes/comments/shares (from objRes,
+  // the post object's own fields) are entirely unaffected either way.
   const [objRes, insightsRes] = await Promise.all([
     fetchJson(`${GRAPH}/${postId}?fields=shares,comments.summary(true),likes.summary(true)&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" }),
-    fetchJson(`${GRAPH}/${postId}/insights?metric=post_impressions,post_engaged_users,post_clicks&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" }),
+    fetchJson(`${GRAPH}/${postId}/insights?metric=post_media_view&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" }),
   ]);
   if (!objRes.ok) return resultError(objRes.result.error ?? `Failed to fetch post ${postId}.`);
 
@@ -105,9 +124,7 @@ async function fetchPostMetricsInternal(pageToken: string, postId: string): Prom
     for (const m of data) {
       const value = m.values[0]?.value ?? 0;
       raw[m.name] = value;
-      if (m.name === "post_impressions") out.impressions = value;
-      else if (m.name === "post_engaged_users") out.reach = value;
-      else if (m.name === "post_clicks") out.clicks = value;
+      if (m.name === "post_media_view") out.impressions = value;
     }
   }
 

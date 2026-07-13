@@ -190,7 +190,7 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ ok: 
     .single();
 
   await issueInvoice(userId, sub.id, payment);
-  await grantCredits("plan_upgrade", monthlyAllotment(payment.plan), `upgrade:${payment.id}`);
+  await grantCredits("plan_upgrade", monthlyAllotment(payment.plan), `plan_upgrade:${payment.id}`);
   await setPlan(userId, payment.plan).catch(() => {});
   await logEvent(userId, "payment_succeeded", `Payment captured for ${planLimits(payment.plan).name}`, { paymentId: payment.id });
   await logEvent(userId, upgrading ? "subscription_upgraded" : "subscription_downgraded", `Now on ${planLimits(payment.plan).name}`, { plan: payment.plan });
@@ -202,7 +202,7 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ ok: 
 async function issueInvoice(userId: string, subscriptionId: string, payment: Payment): Promise<void> {
   const admin = createAdminClient();
   const invoiceNumber = `INV-${new Date().getFullYear()}-${payment.id.slice(0, 8).toUpperCase()}`;
-  await admin.from("invoices").insert({
+  const { error } = await admin.from("invoices").insert({
     user_id: userId,
     subscription_id: subscriptionId,
     payment_id: payment.id,
@@ -215,6 +215,7 @@ async function issueInvoice(userId: string, subscriptionId: string, payment: Pay
     period_start: new Date().toISOString(),
     period_end: periodEnd(new Date(), payment.billing_cycle),
   });
+  if (error) throw error;
 }
 
 export async function retryPayment(paymentId: string): Promise<CheckoutResult> {
@@ -286,18 +287,29 @@ export async function spendCredits(reason: string, amount: number, key?: string,
   return { ok: row.ok, balance: row.balance, reason: row.ok ? undefined : `You're out of AI credits (${row.balance} left). Upgrade your plan or wait for your next monthly reset.` };
 }
 
+/** Sum of this period's debits, queried directly by date rather than pulling a
+ * fixed-size recent-history window and filtering client-side — a heavy user
+ * (e.g. Agency plan, 5000 credits/month) can exceed a few hundred debit rows
+ * within one period alone, and capping-then-filtering silently drops the
+ * oldest in-period rows once the cap is hit, undercounting usage. */
+async function creditsUsedSince(userId: string, period: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.from("ai_credit_history").select("amount").eq("user_id", userId).lt("amount", 0).gte("created_at", period);
+  if (error) throw error;
+  return ((data ?? []) as { amount: number }[]).reduce((s, r) => s + Math.abs(r.amount), 0);
+}
+
 /* ── Usage snapshot ── */
 export async function refreshUsageMetrics(): Promise<UsageSnapshot> {
   const userId = await uid();
   const admin = createAdminClient();
   const period = currentPeriod();
 
-  const [posts, scheduled, connections, creditHistory] = await Promise.all([listAllPosts(), listScheduleEvents(), listConnections(), listCreditHistory(500)]);
+  const [posts, scheduled, connections, creditsUsedThisPeriod] = await Promise.all([listAllPosts(), listScheduleEvents(), listConnections(), creditsUsedSince(userId, period)]);
 
   const storageBytes = posts.reduce((sum, p) => sum + p.media.reduce((s, m) => s + (m.size ?? 0), 0), 0);
   const activeSchedules = scheduled.filter((s) => s.status === "scheduled" || s.status === "queued").length;
   const activeConnections = connections.filter((c) => c.status !== "disconnected").length;
-  const creditsUsedThisPeriod = creditHistory.filter((c) => c.amount < 0 && c.created_at >= period).reduce((s, c) => s + Math.abs(c.amount), 0);
 
   const { data, error } = await admin
     .from("usage_metrics")
@@ -359,7 +371,12 @@ export async function adminConfirmPayment(payment: Payment, razorpayPaymentId: s
     status: "paid", period_start: new Date().toISOString(), period_end: periodEnd(new Date(), payment.billing_cycle),
   });
 
-  await admin.from("ai_credit_history").insert({ user_id: payment.user_id, amount: monthlyAllotment(payment.plan), reason: "plan_upgrade", meta: { key: `webhook:${payment.id}` } });
+  // Same idempotency key as confirmPayment's grantCredits() call — this webhook
+  // path and the client-triggered confirmation path race on the same payment
+  // (Razorpay's webhook commonly arrives within the same window as the client's
+  // post-checkout confirmation call); a *different* key here let both grant a
+  // full allotment for one payment, since the unique index is keyed on this value.
+  await admin.from("ai_credit_history").insert({ user_id: payment.user_id, amount: monthlyAllotment(payment.plan), reason: "plan_upgrade", meta: { key: `plan_upgrade:${payment.id}` } });
   await admin.from("billing_events").insert({ user_id: payment.user_id, event_type: "payment_succeeded", message: "Confirmed via webhook", metadata: { paymentId: payment.id } });
   await setPlan(payment.user_id, payment.plan).catch(() => {});
   await notify({ userId: payment.user_id, type: "subscription_upgraded", title: `You're now on ${planLimits(payment.plan).name}`, message: "Your payment was captured and your plan is active.", actionHref: "/billing", sendEmail: true }).catch(() => {});
@@ -367,9 +384,14 @@ export async function adminConfirmPayment(payment: Payment, razorpayPaymentId: s
 
 export async function adminMarkPaymentFailed(orderId: string, reason: string): Promise<void> {
   const admin = createAdminClient();
-  const { data } = await admin.from("payments").select("id,user_id").eq("razorpay_order_id", orderId).maybeSingle();
+  const { data } = await admin.from("payments").select("id,user_id,status").eq("razorpay_order_id", orderId).maybeSingle();
   if (!data) return;
-  const row = data as { id: string; user_id: string };
+  const row = data as { id: string; user_id: string; status: string };
+  // One order can carry multiple payment attempts (a declined card retried
+  // within the same checkout); Razorpay doesn't guarantee webhook delivery
+  // order, so a late `payment.failed` for an earlier attempt must not
+  // downgrade a payment this order already captured via a later retry.
+  if (row.status === "captured") return;
   await admin.from("payments").update({ status: "failed", failure_reason: reason }).eq("id", row.id);
   await admin.from("billing_events").insert({ user_id: row.user_id, event_type: "payment_failed", message: reason, metadata: { paymentId: row.id } });
   await notify({ userId: row.user_id, type: "payment_failed", title: "Payment failed", message: reason, actionHref: "/billing", sendEmail: true }).catch(() => {});

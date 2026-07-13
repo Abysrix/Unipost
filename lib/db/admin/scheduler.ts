@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { publishScheduledPost } from "@/lib/schedule/publishing";
+import { publishScheduledPost, NON_RETRYABLE_ERRORS } from "@/lib/schedule/publishing";
 import { adminAwardXp } from "@/lib/db/xp";
 import { notify } from "@/lib/notifications/service";
 import { invalidateCreatorContext } from "@/lib/ai/contextCache";
@@ -99,7 +99,11 @@ export async function processScheduledQueue(): Promise<{ processed: number; succ
         await invalidateCreatorContext(sp.user_id).catch(() => {});
       } else {
         failed++;
-        const nextRetryCount = sp.retry_count + 1;
+        // Same "don't burn the retry budget on a doomed attempt" logic as
+        // the interactive publishNow (lib/db/schedule.ts) — a non-retryable
+        // error jumps straight to the retry limit.
+        const nonRetryable = result.errorCode ? NON_RETRYABLE_ERRORS.has(result.errorCode) : false;
+        const nextRetryCount = nonRetryable ? Math.max(sp.retry_count + 1, sp.max_retries) : sp.retry_count + 1;
         await admin.from("scheduled_posts").update({ status: "failed", error: result.error ?? "Publishing failed", retry_count: nextRetryCount }).eq("id", sp.id);
         await logPublishing(admin, sp.user_id, sp, "failed", result.error);
         await syncPostStatusAdmin(admin, sp.post_id);

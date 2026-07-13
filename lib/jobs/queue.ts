@@ -109,14 +109,22 @@ export async function completeJob(id: string, summary?: Record<string, unknown>)
   await logJob(id, "info", "Job completed", summary ?? {});
 }
 
-/** Increments `attempts`; moves to `retrying` if under `max_attempts`, otherwise `failed` — the dead-letter state, queryable directly as `jobs where status = 'failed'`. */
+/** Exponential backoff for a retrying job — 2min, 4min, 8min, ... capped at 30min, so a sustained outage spaces retries out instead of burning `max_attempts` on the very next cron tick. */
+function backoffUntil(attempts: number): string {
+  const minutes = Math.min(2 ** attempts, 30);
+  return new Date(Date.now() + minutes * 60_000).toISOString();
+}
+
+/** Increments `attempts`; moves to `retrying` (with backoff) if under `max_attempts`, otherwise `failed` — the dead-letter state, queryable directly as `jobs where status = 'failed'`. */
 export async function failJob(id: string, error: string): Promise<void> {
   const admin = createAdminClient();
   const { data } = await admin.from("jobs").select("attempts,max_attempts").eq("id", id).maybeSingle();
   const row = data as { attempts: number; max_attempts: number } | null;
   const attempts = (row?.attempts ?? 0) + 1;
   const exhausted = !row || attempts >= row.max_attempts;
-  await admin.from("jobs").update({ status: exhausted ? "failed" : "retrying", attempts, error }).eq("id", id);
+  const patch: Record<string, unknown> = { status: exhausted ? "failed" : "retrying", attempts, error };
+  if (!exhausted) patch.run_after = backoffUntil(attempts);
+  await admin.from("jobs").update(patch).eq("id", id);
   await logJob(id, "error", error);
 }
 

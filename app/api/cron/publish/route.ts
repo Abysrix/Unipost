@@ -15,14 +15,15 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const bypass = searchParams.get("bypass") === "true" && process.env.NODE_ENV === "development";
 
-  // Security gate: verify cron authorization
+  // Security gate: verify cron authorization. Fails CLOSED — an unset
+  // CRON_SECRET must reject every non-bypass request, not silently accept
+  // them; `bypass` itself is already gated to NODE_ENV==="development" above,
+  // so this never opens the endpoint in production regardless of config.
   const authHeader = req.headers.get("Authorization");
   const expectedSecret = process.env.CRON_SECRET;
-  
-  if (expectedSecret && !bypass) {
-    if (authHeader !== `Bearer ${expectedSecret}`) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+
+  if (!bypass && (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`)) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
   try {

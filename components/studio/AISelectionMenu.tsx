@@ -67,18 +67,26 @@ export default function AISelectionMenu({
     return () => ta.removeEventListener("mouseup", onMouseUp);
   }, [textareaRef, close]);
 
-  // Dismiss on outside click or scroll (coords go stale on scroll).
+  // Dismiss on outside click, scroll (coords go stale), or edited content
+  // (start/end offsets go stale) — not while `busy`, matching the scroll
+  // guard: an in-flight run() already captured its own sel in a closure at
+  // call time, so closing the popover's state here can't corrupt that
+  // request; it would only be confusing to dismiss the UI mid-request.
   useEffect(() => {
     if (!anchor) return;
+    const ta = textareaRef.current;
     const onDown = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node) && e.target !== textareaRef.current) close();
     };
     const onScroll = () => busy === null && close();
+    const onInput = () => busy === null && close();
     document.addEventListener("mousedown", onDown);
     window.addEventListener("scroll", onScroll, true);
+    ta?.addEventListener("input", onInput);
     return () => {
       document.removeEventListener("mousedown", onDown);
       window.removeEventListener("scroll", onScroll, true);
+      ta?.removeEventListener("input", onInput);
     };
   }, [anchor, busy, close, textareaRef]);
 

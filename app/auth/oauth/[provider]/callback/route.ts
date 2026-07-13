@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/getUser";
 import { platforms, type PlatformId } from "@/config/platforms";
 import { verifyState } from "@/lib/integrations/crypto";
@@ -8,6 +9,8 @@ import { seedAnalyticsForPlatform } from "@/lib/db/growth";
 import { isSafeRedirect } from "@/lib/utils";
 
 export const runtime = "nodejs";
+
+const PKCE_COOKIE = "unipost_pkce_verifier";
 
 function isPlatformId(v: string): v is PlatformId {
   return platforms.some((p) => p.id === v);
@@ -39,14 +42,19 @@ export async function GET(request: Request, { params }: { params: { provider: st
 
   try {
     const redirectUri = `${origin}/auth/oauth/${platform}/callback`;
-    const { tokens, profile } = await exchangeCode(platform, code, redirectUri, `${user.id}:${platform}`, state.codeVerifier);
+    // Set by /start as an httpOnly cookie, not carried in `state` — see that
+    // route's comment. Single-use: cleared below regardless of outcome.
+    const codeVerifier = cookies().get(PKCE_COOKIE)?.value;
+    const { tokens, profile } = await exchangeCode(platform, code, redirectUri, `${user.id}:${platform}`, codeVerifier);
     await completeConnection(platform, profile, tokens);
     await seedAnalyticsForPlatform(platform).catch(() => {});
   } catch (e) {
+    cookies().delete(PKCE_COOKIE);
     const message = e instanceof Error ? e.message : "connect_failed";
     return NextResponse.redirect(`${origin}/integrations?error=${encodeURIComponent(message)}&platform=${platform}`);
   }
 
+  cookies().delete(PKCE_COOKIE);
   const returnTo = isSafeRedirect(state.returnTo) ? state.returnTo : "/integrations";
   return NextResponse.redirect(`${origin}${returnTo}?connected=${platform}`);
 }

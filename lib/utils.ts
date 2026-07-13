@@ -59,9 +59,13 @@ export function wordCount(text: string): number {
  * Guards a redirect target from sending users off-site. `//evil.com` passes
  * a naive `startsWith("/")` check (browsers resolve protocol-relative URLs
  * against the current scheme) — reject those too, not just `http(s)://`.
+ * Also reject any backslash: WHATWG URL parsing (every browser, and Next's
+ * own client router when resolving a Server Action's redirect) normalizes a
+ * leading `/\` the same as `//`, so `/\evil.com` is an equally valid
+ * protocol-relative bypass that a plain `//` check misses.
  */
 export function isSafeRedirect(path: unknown): path is string {
-  return typeof path === "string" && path.startsWith("/") && !path.startsWith("//");
+  return typeof path === "string" && path.startsWith("/") && !path.startsWith("//") && !path.includes("\\");
 }
 
 /** The house easing curves, as cubic-bezier arrays (Framer-ready). */

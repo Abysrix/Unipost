@@ -22,7 +22,14 @@ export default async function CreatePage({
   ]);
 
   return (
+    // Keyed on the post id so navigating between posts (e.g. Duplicate's
+    // router.push to a new ?id=) forces a real remount — CreateStudio seeds
+    // its editor state with useState(initial?.x) once; without this key,
+    // switching posts on the same route instance leaves stale state (title,
+    // content, and critically the internal id used by autosave) in place,
+    // so subsequent edits can silently save to the wrong post.
     <CreateStudio
+      key={initial?.id ?? "new"}
       initial={initial}
       userId={user.id}
       authorName={profile.display_name || user.email?.split("@")[0] || "Creator"}

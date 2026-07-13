@@ -1,4 +1,5 @@
 import type { PlatformPublisher, PublishResult, ValidationResult } from "../publishing";
+import { classifyHttpError } from "../publishing";
 import type { ScheduledEvent } from "@/types/schedule";
 import { getValidAccessToken, getDefaultAccountId } from "@/lib/db/integrations";
 import { getPlatform, hasCapability } from "@/config/platforms";
@@ -16,17 +17,17 @@ export const youtubePublisher: PlatformPublisher = {
     }
 
     if (!accountId) {
-      return { ok: false, error: "No channel connection selected for this schedule." };
+      return { ok: false, error: "No channel connection selected for this schedule.", errorCode: "no_connection" };
     }
 
     const accessToken = await getValidAccessToken(accountId);
     if (!accessToken) {
-      return { ok: false, error: "Could not retrieve valid access token for YouTube channel." };
+      return { ok: false, error: "Could not retrieve valid access token for YouTube channel.", errorCode: "expired_token" };
     }
 
     const mediaItem = sp.post?.media.find((m) => m.type === "video");
     if (!mediaItem) {
-      return { ok: false, error: "YouTube publishing requires a video attachment." };
+      return { ok: false, error: "YouTube publishing requires a video attachment.", errorCode: "invalid_media_type" };
     }
 
     try {
@@ -108,7 +109,7 @@ export const youtubePublisher: PlatformPublisher = {
       if (!uploadRes.ok) {
         const errJson = await uploadRes.json().catch(() => ({}));
         const errMsg = errJson?.error?.message || `YouTube upload failed with status ${uploadRes.status}`;
-        return { ok: false, error: errMsg };
+        return { ok: false, error: errMsg, errorCode: classifyHttpError(uploadRes.status, errMsg) };
       }
 
       const uploadJson = await uploadRes.json();

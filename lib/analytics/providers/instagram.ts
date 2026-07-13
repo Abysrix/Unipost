@@ -17,10 +17,18 @@ import { resolveAuthForPlatform, fetchJson, listManagedPages, deriveEngagement, 
  *   field); historical days stay whatever they already were before this
  *   sync started (untouched, not fabricated) until enough real days
  *   accumulate.
- * - `impressions` was deprecated at the *account* level for Insights API
- *   versions from mid-2024 onward (superseded by `reach`) but remains valid
- *   at the *media* (per-post) level as of this writing — requested only
- *   where it's actually supported.
+ * - Meta deprecated `profile_views`/`website_clicks` (account-level) and
+ *   `impressions`/`video_views`/`plays` (media-level) effective Jan 8, 2025
+ *   (Graph API v21+); `impressions` fully gone everywhere by Apr 21, 2025.
+ *   Media-level has a confirmed successor (`views`, requested below for
+ *   video media). Account-level does not — Meta's own current user-insights
+ *   reference lists no profile-views/visits-equivalent metric at that
+ *   endpoint at all, so `profile_visits`/`clicks` are left at their default
+ *   0 here rather than guessing a replacement metric name that might not
+ *   exist or might carry different semantics (same "never fabricate, report
+ *   what's real" rule this file already follows for `follower_count`).
+ *   Re-verify against developers.facebook.com/docs/instagram-platform if
+ *   Meta adds an account-level equivalent later.
  * - Audience demographics require `engaged_audience_demographics`/
  *   `follower_demographics` breakdown metrics, gated behind a minimum
  *   follower count Meta doesn't publish a fixed number for and enforces
@@ -63,8 +71,10 @@ async function fetchAccountMetricsInternal(igUserId: string, pageToken: string, 
   const until = Math.floor(Date.now() / 1000);
   const byDate = new Map<string, NormalizedDailyMetrics>();
 
-  // reach/profile_views/website_clicks: real historical daily time series, available regardless of follower count.
-  const res = await fetchJson(`${GRAPH}/${igUserId}/insights?metric=reach,profile_views,website_clicks&period=day&since=${since}&until=${until}&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" });
+  // reach: real historical daily time series, available regardless of follower
+  // count. profile_views/website_clicks were dropped — deprecated Jan 2025
+  // with no confirmed account-level successor (see the file's top comment).
+  const res = await fetchJson(`${GRAPH}/${igUserId}/insights?metric=reach&period=day&since=${since}&until=${until}&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" });
   if (res.ok) {
     const metrics = (res.data as { data?: InsightMetric[] } | null)?.data ?? [];
     for (const metric of metrics) {
@@ -72,8 +82,6 @@ async function fetchAccountMetricsInternal(igUserId: string, pageToken: string, 
         const date = point.end_time.slice(0, 10);
         const row = byDate.get(date) ?? blankRow(date);
         if (metric.name === "reach") row.reach = point.value;
-        else if (metric.name === "profile_views") row.profile_visits = point.value;
-        else if (metric.name === "website_clicks") row.clicks = point.value;
         byDate.set(date, row);
       }
     }
@@ -110,7 +118,11 @@ async function fetchAccountMetricsInternal(igUserId: string, pageToken: string, 
 }
 
 async function fetchPostMetricsInternal(igUserId: string, pageToken: string, mediaId: string, mediaType?: "image" | "video"): Promise<ProviderResult<NormalizedPostMetrics>> {
-  const metrics = mediaType === "video" ? "impressions,reach,likes,comments,saved,shares,plays,video_views" : "impressions,reach,likes,comments,saved,shares";
+  // impressions/plays/video_views deprecated (see file header) — views is the
+  // confirmed current media-level successor, requested only for video since
+  // that's where plays/video_views used to apply (not widening scope to
+  // images without confirming Meta actually returns `views` for that type).
+  const metrics = mediaType === "video" ? "reach,likes,comments,saved,shares,views" : "reach,likes,comments,saved,shares";
   const res = await fetchJson(`${GRAPH}/${mediaId}/insights?metric=${metrics}&access_token=${encodeURIComponent(pageToken)}`, { method: "GET" });
   if (!res.ok) return resultError(res.result.error ?? `Failed to fetch insights for media ${mediaId}.`);
 
@@ -120,13 +132,12 @@ async function fetchPostMetricsInternal(igUserId: string, pageToken: string, med
   for (const m of data) {
     const value = m.values[0]?.value ?? 0;
     raw[m.name] = value;
-    if (m.name === "impressions") out.impressions = value;
-    else if (m.name === "reach") out.reach = value;
+    if (m.name === "reach") out.reach = value;
     else if (m.name === "likes") out.likes = value;
     else if (m.name === "comments") out.comments = value;
     else if (m.name === "saved") out.saves = value;
     else if (m.name === "shares") out.shares = value;
-    else if (m.name === "plays" || m.name === "video_views") out.views = Math.max(out.views, value);
+    else if (m.name === "views") out.views = value;
   }
   return { ok: true, data: out };
 }

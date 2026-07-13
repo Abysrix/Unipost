@@ -110,8 +110,16 @@ export default function AIStudio({
         setMessages((m) => m.map((msg) => (msg.id === asstId && !msg.content ? { ...msg, content: `⚠ ${errMsg}` } : msg)));
       }
     } finally {
-      setStreaming(false);
-      abortRef.current = null;
+      // Only clear state this call still owns. If a second runStream() (e.g.
+      // "New chat" then an immediate send) started before this one's aborted
+      // fetch finished unwinding, abortRef.current already points at the
+      // *new* call's controller — clearing it here would null out a still-
+      // running stream's controller (breaking Stop) and flip `streaming`
+      // to false while it's actually still streaming.
+      if (abortRef.current === controller) {
+        setStreaming(false);
+        abortRef.current = null;
+      }
     }
   }
 

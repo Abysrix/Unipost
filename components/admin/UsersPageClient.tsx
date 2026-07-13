@@ -49,7 +49,13 @@ export default function UsersPageClient({ initialUsers, total }: { initialUsers:
     });
   }
   function toggleSelectAll() {
-    setSelected((prev) => (prev.size === filtered.length ? new Set() : new Set(filtered.map((u) => u.id))));
+    // Membership check, not a size comparison — `selected` persists across
+    // filter/search changes, so a coincidental size match against a
+    // *different* set of visible rows would silently wipe the real
+    // selection instead of selecting what the checkbox (UserTable's own
+    // `.every()` check) shows as visible-and-selected.
+    const allVisibleSelected = filtered.length > 0 && filtered.every((u) => selected.has(u.id));
+    setSelected(allVisibleSelected ? new Set() : new Set(filtered.map((u) => u.id)));
   }
 
   async function bulkSuspend() {

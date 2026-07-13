@@ -26,6 +26,13 @@ const MediaUploader = forwardRef<MediaUploaderHandle, {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Tracks the latest committed media array, kept in sync with the prop on
+  // every render. Both handleFiles and remove() read/write through this
+  // (never a per-call local snapshot of `media`) so a remove() that lands
+  // mid-upload doesn't get silently overwritten when the upload's next
+  // onChange fires from a snapshot taken before the removal happened.
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
 
   useImperativeHandle(ref, () => ({ open: () => inputRef.current?.click() }));
 
@@ -33,10 +40,9 @@ const MediaUploader = forwardRef<MediaUploaderHandle, {
     if (!files?.length) return;
     setError(null);
     const supabase = createClient();
-    let current = media;
 
     for (const file of Array.from(files)) {
-      if (current.length >= MEDIA.maxPerPost) {
+      if (mediaRef.current.length >= MEDIA.maxPerPost) {
         setError(`You can attach up to ${MEDIA.maxPerPost} items.`);
         break;
       }
@@ -64,14 +70,17 @@ const MediaUploader = forwardRef<MediaUploaderHandle, {
 
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
       const type: MediaType = file.type.startsWith("video") ? "video" : "image";
-      current = [...current, { path, url: data.publicUrl, type, name: file.name, size: file.size }];
-      onChange(current);
+      const next = [...mediaRef.current, { path, url: data.publicUrl, type, name: file.name, size: file.size }];
+      mediaRef.current = next;
+      onChange(next);
     }
     if (inputRef.current) inputRef.current.value = "";
   }
 
   async function remove(path: string) {
-    onChange(media.filter((m) => m.path !== path));
+    const next = mediaRef.current.filter((m) => m.path !== path);
+    mediaRef.current = next;
+    onChange(next);
     try {
       await createClient().storage.from(BUCKET).remove([path]);
     } catch {

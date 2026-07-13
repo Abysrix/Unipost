@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { listAllPosts } from "@/lib/db/posts";
 import { listGenerations } from "@/lib/db/ai";
 import { generateText } from "@/lib/ai/gemini";
+import { invalidateCreatorContext } from "@/lib/ai/contextCache";
 import type { PlatformId } from "@/config/platforms";
 
 /**
@@ -159,6 +160,13 @@ export async function inferAndUpdateMemory(userId: string): Promise<void> {
     }
 
     await admin.from("ai_memory").upsert(patch, { onConflict: "user_id" });
+    // Every other write that changes what the Context Service reports
+    // invalidates the cache immediately (lib/db/schedule.ts, lib/db/
+    // integrations.ts) — this one didn't, so the tone/CTA/hashtag style a
+    // generation just updated wouldn't actually show up in prompts for up
+    // to CACHE_TTL_MS (20 minutes), even though this runs on nearly every
+    // AI call specifically to keep that style current.
+    await invalidateCreatorContext(userId).catch(() => {});
   } catch {
     /* best-effort — never blocks the AI response that triggered this */
   }

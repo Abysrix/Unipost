@@ -43,20 +43,33 @@ export default function SchedulerStudio({ initialEvents, drafts }: { initialEven
   const reminders = useMemo(() => (mounted ? deriveReminders(events, drafts.length) : []), [events, drafts.length, mounted]);
   const activeCount = events.filter((e) => ["scheduled", "queued", "failed", "publishing"].includes(e.status)).length;
 
-  /* ── mutations (optimistic) ── */
+  /* ── mutations (optimistic, reverted on a failed server result) ── */
   const patch = (id: string, p: Partial<ScheduledEvent>) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...p } : e)));
+
+  // Every handler below used to be pure fire-and-forget: patch local state,
+  // `void` the server call, never look at the result. A real failure (a
+  // stale row, a retry-limit error, an RLS rejection) left the calendar/
+  // queue permanently showing something the database never actually did,
+  // recoverable only by a hard reload. `run()` captures the pre-patch
+  // snapshot and restores it if the server call comes back with an error.
+  function run(id: string, action: () => Promise<{ error?: string } | void>) {
+    const prev = events.find((e) => e.id === id);
+    void action().then((res) => {
+      if (res && "error" in res && res.error && prev) patch(id, prev);
+    });
+  }
 
   function rescheduleInstant(id: string, instant: Date) {
     const iso = instant.toISOString();
     const tz = localTimezone();
     patch(id, { scheduled_time: iso, timezone: tz, status: "scheduled", error: null });
-    void reschedulePost({ id, scheduledTime: iso, timezone: tz });
+    run(id, () => reschedulePost({ id, scheduledTime: iso, timezone: tz }));
   }
   function resize(id: string, durationMin: number) {
     const ev = events.find((e) => e.id === id);
     if (!ev) return;
     patch(id, { duration_min: durationMin, status: "scheduled", error: null });
-    void reschedulePost({ id, scheduledTime: ev.scheduled_time, timezone: ev.timezone, durationMin });
+    run(id, () => reschedulePost({ id, scheduledTime: ev.scheduled_time, timezone: ev.timezone, durationMin }));
   }
   async function publishNow(id: string) {
     setBusyId(id);
@@ -68,27 +81,33 @@ export default function SchedulerStudio({ initialEvents, drafts }: { initialEven
   }
   function retry(id: string) {
     patch(id, { status: "queued", error: null });
-    void retryScheduled(id);
+    run(id, () => retryScheduled(id));
   }
   function cancel(id: string) {
     patch(id, { status: "canceled" });
-    void cancelScheduled(id);
+    run(id, () => cancelScheduled(id));
   }
   function del(id: string) {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
-    void deleteScheduled(id);
+    const prev = events.find((e) => e.id === id);
+    setEvents((cur) => cur.filter((e) => e.id !== id));
+    void deleteScheduled(id).then((res) => {
+      if (res.error && prev) setEvents((cur) => (cur.some((e) => e.id === id) ? cur : [...cur, prev]));
+    });
   }
   function archive(id: string) {
     patch(id, { status: "canceled" });
-    void archiveScheduled(id);
+    run(id, () => archiveScheduled(id));
   }
   function togglePriority(id: string, priority: boolean) {
     patch(id, { priority });
-    void setSchedulePriority(id, priority);
+    run(id, () => setSchedulePriority(id, priority));
   }
   function reorder(ids: string[]) {
+    const prevPositions = new Map(events.map((e) => [e.id, e.position]));
     setEvents((prev) => prev.map((e) => (ids.indexOf(e.id) === -1 ? e : { ...e, position: ids.indexOf(e.id) })));
-    void reorderScheduleQueue(ids);
+    void reorderScheduleQueue(ids).then((res) => {
+      if (res.error) setEvents((prev) => prev.map((e) => (prevPositions.has(e.id) ? { ...e, position: prevPositions.get(e.id)! } : e)));
+    });
   }
   async function duplicate(id: string) {
     setBusyId(id);
