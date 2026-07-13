@@ -139,7 +139,10 @@ export async function exchangeCode(
     body.set("code_verifier", codeVerifier);
   }
   const tokenRes = await fetch(config.tokenUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
-  if (!tokenRes.ok) throw new Error(`${config.displayName} token exchange failed (${tokenRes.status}).`);
+  if (!tokenRes.ok) {
+    const errText = await tokenRes.text().catch(() => "");
+    throw new Error(`${config.displayName} token exchange failed (${tokenRes.status}): ${errText || "No details provided"}`);
+  }
   const json = (await tokenRes.json()) as Record<string, unknown>;
   const tokens: ProviderTokens = {
     accessToken: String(json.access_token),
