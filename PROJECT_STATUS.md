@@ -1,8 +1,8 @@
 # PROJECT_STATUS.md
 ### Living status log — the accurate "current state". Update at the end of every sprint.
 
-## 🚀 RELEASE CANDIDATE 1 (RC1) → Integration Phase
-_Last updated: Integration Sprint 6 (Platform Infrastructure, Automation & Observability) — complete; `tsc` clean, `eslint` clean, **`next build` now completes end-to-end (all 32 routes) for the first time this Integration Phase** — the six-sprint-old "Collecting page data" fault was root-caused post-sprint (a `.next`-junction/Node-module-resolution path-topology issue, not OneDrive locking as long suspected) and fixed; see the known-risks entry for the full diagnosis. Requires Supabase migrations (0001–0016) + Supabase keys + `INTEGRATIONS_SECRET_KEY` + `CRON_SECRET` to run live; `RESEND_API_KEY`/webhook secrets are optional (see this sprint's setup step). **⚠ Migrations `0013`/`0014`/`0015` from prior sprints are still pending live application — see their own entries.** **⚠ `.env.example` was discovered missing from the working tree this sprint** (present in old commits, lost in the earlier antigravity revert, never recreated) — not rebuilt this sprint (out of scope for a platform-infrastructure sprint), flagged as a follow-up. See this sprint's log entry below for the job queue, background workers, webhooks, notifications and observability._
+## 🚀 UniPost v1.0.0 — Release Candidate 1 (RC1)
+_Last updated: Integration Sprint 7 (Release Candidate & Production Certification) — complete. `tsc` clean, `eslint` clean, `next build` clean end-to-end (all 32 routes). Certification verdict: **🟡 RELEASE CANDIDATE** (see the Sprint 7 log entry and the standalone RC1 certification report for the full scoring and justification — not "not ready," but not declaring "production ready" without a live-credentials click-through and the still-open items listed in Known risks below). Requires Supabase migrations `0001`→`0022` + Supabase keys + `INTEGRATIONS_SECRET_KEY` + `CRON_SECRET` to run live; `RESEND_API_KEY`/webhook secrets/per-platform OAuth credentials are all optional (working stub/simulated mode for each). `.env.example` is present, current, and covers every env var referenced in code (verified this sprint). See [`docs/SETUP_GUIDES.md`](./docs/SETUP_GUIDES.md) for per-platform OAuth app registration and an admin console walkthrough._
 
 ## Legend
 ✅ done · 🟡 partial · 🔴 not started · ⛔ blocked
@@ -34,11 +34,158 @@ Auth is being built **from scratch in Sprint 1.**
 | **OAuth Hardening & Multi-Account Support** | ✅ | **Integration Sprint 2 done.** Closed the same "blanket own-row write policy" RLS gap Sprint 9's `0009_security_hardening.sql` found on billing — migration `0011` locks `connected_accounts`/`oauth_tokens`/`platform_permissions`/`sync_logs`/`integration_events` to read-only for `authenticated`; `lib/db/integrations.ts` moved to the service-role client, same pattern as `lib/db/billing.ts` (two write paths — `deleteConnection`/`renameConnection` — needed an explicit `user_id` filter added during the conversion, since the service-role client no longer gets that from RLS for free). Real S256 PKCE for X/Twitter was found **already correctly implemented** going into this sprint — verified via direct code inspection rather than assumed from memory, then cleaned up one vestigial artifact: the static provider config still carried a fake `code_challenge: "challenge"` placeholder that `buildAuthorizeUrl` was already silently overriding whenever a real verifier was supplied; removed it and added a declarative `pkce: true` config field so `requiresPkce()` reads config instead of hardcoding a platform check. Real provider-side revoke for Instagram/Facebook/Threads (Meta Graph API `DELETE .../me/permissions`) alongside the pre-existing Google one, via a new `revokeMethod: "meta" | "google"` discriminator — 2 of 6 platforms previously had no working revoke at all; LinkedIn/X's revoke shapes need client credentials in the request body (a third, different shape) and are left as a documented no-op rather than guessed at. Multi-account primary/nickname (`is_default`, `nickname` columns; at most one default per user+platform via a partial unique index). Avatar images (`profile_image`) were stored since Sprint 7 but never rendered anywhere — now shown in both the platform grid and connection detail. TikTok/Pinterest gained real-endpoint provider-config stubs (`FUTURE_PROVIDER_CONFIGS`) without widening `PlatformId` (exhaustively matched across scheduling/composer/analytics — out of this sprint's "only establish connections" scope). See this sprint's log entry for the full design rationale. |
 
 ## Environment
-- `.next` is junctioned to `%TEMP%\unipost-next` (OneDrive corrupts in-place `.next`).
+- ~~`.next` is junctioned to `%TEMP%\unipost-next` (OneDrive corrupts in-place `.next`).~~
+  **ROOT-CAUSED AND FIXED in Integration Sprint 7.** The actual cause was never
+  OneDrive file-locking (that theory was carried, unverified, across 6 sprints) —
+  Next's auto-generated `pages/`-compat shims (`_document.js` etc.) are
+  `require()`'d as raw CommonJS at server runtime and resolve bare specifiers by
+  walking up the directory tree from `.next`'s own location on disk. Junctioning
+  `.next` alone (the old workaround) put it outside that walk-up chain, so it
+  never reached the real project's `node_modules`. Fixed by junctioning `.next`
+  to `%TEMP%\unipost-build\next`, with a **sibling** `%TEMP%\unipost-build\
+  node_modules` junction pointing back at the real `node_modules` — restoring it
+  to Node's resolution chain. Verified via `next dev` (`/auth/confirm`, the
+  historically-failing route, now clean) and a full `next build` (all 32 routes,
+  first clean "Collecting page data" pass this entire Integration Phase). See
+  README's [Known local-environment quirks](./README.md#known-local-environment-quirks).
 - `node_modules` installed locally.
 - **Secrets:** `.env.local` (gitignored). User provides Supabase keys. See `.env.example`.
+- Migrations: `0001` → `0022` (see `supabase/migrations/`). All idempotent, safe to re-run.
 
 ## Sprint log
+- **Integration Sprint 7 — Release Candidate (RC1) & Production Certification ✅:**
+  The final hardening pass before launch — explicitly no new features, no UI
+  redesign, no rewriting working systems, only production-quality fixes. Full
+  scoring, architecture review, tech debt, roadmap, and the certification
+  verdict live in the standalone RC1 report (delivered alongside this update);
+  this entry covers what changed in the codebase itself.
+  **Security (Phase 5):** closed the last standing RLS write-lockdown gap —
+  `xp_history`, `achievements`, `publishing_logs`, `sync_logs`,
+  `integration_events` had carried blanket own-row write policies since
+  Sprints 4–6 (flagged as a deferred follow-up since Sprint 10; see the
+  now-struck-through Known-risks entry below). Migration
+  `0017_final_rls_hardening.sql` drops the insert/update/delete policies on
+  all five (read access untouched); `lib/db/xp.ts::awardXp`,
+  `lib/db/schedule.ts`'s internal `log()`, and
+  `lib/db/growth.ts::syncAchievements` converted to the admin client to match
+  — `sync_logs`/`integration_events` needed no code change, already
+  admin-client since Integration Sprint 2. Also added **Postgres-backed rate
+  limiting** (`0018_rate_limiting.sql`'s `rate_limits` table +
+  `private.check_rate_limit()`, `0019_rate_limiting_rpc.sql`'s
+  `public.check_rate_limit()` service-role-only wrapper so PostgREST's
+  `.rpc()` can actually reach it, `lib/security/rateLimit.ts`) — Postgres-backed
+  rather than in-memory specifically because this app deploys to serverless
+  instances that share no memory across cold starts. Wired into
+  `login`/`signup`/`requestPasswordReset` and every AI entry point
+  (`/api/ai/chat`, `runAction`, `analyzeMediaForPost`); fails open on a DB
+  error (rate limiting is defense-in-depth, not the primary gate — contrast
+  the credit-balance check, which fails closed). `lib/jobs/workers/
+  cleanupWorker.ts` extended to purge `rate_limits` rows past their window.
+  Two more migrations found from a parallel session and audited rather than
+  assumed correct (this Integration Phase's standing practice): `0020_fix_
+  profiles_plan_check.sql` (converts `profiles.plan` to a proper Postgres
+  ENUM for dashboard UX, backfills any profile/subscription plan drift —
+  lossless, non-destructive, verified against every `plan` comparison in app
+  code) and `0021_fix_publishing_queue_security_invoker.sql` (the
+  `publishing_queue` view was implicitly `SECURITY DEFINER`, bypassing RLS on
+  `scheduled_posts` for its own queries — never actually exploitable, since
+  the view already hardcodes `user_id = auth.uid()`, but a real gap closed
+  for correctness and Supabase's security linter; verified `scheduled_posts`
+  has a working RLS policy underneath before trusting the fix doesn't
+  regress functionality).
+  **Codebase audit (Phase 1) — dead code / duplication / unused deps,
+  performance, accessibility:** the 3 background research agents spawned for
+  this were lost to a session-wide API usage-limit error before producing
+  any findings (infrastructure failure, not a task-logic one) — covered
+  directly instead of re-spawned. `package.json`'s 15 runtime deps all
+  verified genuinely used (grep per import); zero `TODO`/`FIXME`/`.bak`/
+  leftover scratch files; exactly one `console.log` call in the entire
+  codebase, and it's the intentional one inside `lib/monitoring/logger.ts`
+  itself. `tsc`/`eslint` both clean, both before and after this sprint's
+  edits. Performance: the heavy `three.js`/`@react-three/fiber` landing-page
+  background is already correctly `next/dynamic`-split with `ssr: false`;
+  zero cross-imports from the authenticated app into marketing-only
+  components; `next.config.mjs` already has `optimizePackageImports` and
+  AVIF/WebP configured; every raw `<img>` (vs. `next/image`) is individually,
+  deliberately justified with an inline comment (external OAuth avatar URLs,
+  user-uploaded blob previews) rather than a blanket lint suppression.
+  **Real bugs found and fixed:** (1) `components/app/UserMenu.tsx` hardcoded
+  a specific Google photo-reference ID into a string-match blocking that one
+  avatar — dead weight at best (the component already has a correct, generic
+  `onError`-driven fallback to initials) and a leftover personal-data
+  debugging artifact baked into shared source at worst; removed, the generic
+  fallback already covers this. (2) `components/ui/Modal.tsx` — the shared
+  dialog used by every modal in the app (reschedule, disconnect, checkout,
+  confirm-danger, etc.) had real focus management (moves focus in, restores
+  it on close, Escape-to-close) but no focus **trap** — Tab could walk focus
+  out of an open modal into the page behind it, a real gap against the ARIA
+  dialog pattern. Added Tab/Shift+Tab cycling within the dialog's focusable
+  elements, purely additive to the existing keydown handler — every
+  pre-existing behavior (Escape, overlay click, focus restore) unchanged.
+  Native HTML5 drag-and-drop queue reordering (`QueueCard`) has no keyboard
+  alternative — a known, real a11y limitation, left as a documented gap
+  rather than a mid-sprint new-interaction-mode addition (out of scope per
+  "do not add new features").
+  **Database review (Phase 6):** all 39 tables across `0001`–`0021` audited
+  for FK/`on delete`/index consistency (spot-verified against the migrations
+  actually read in full this Integration Phase — broadly consistent, one
+  minor cosmetic inconsistency noted: `subscriptions.plan`/`payments.plan`
+  stayed `text` + `CHECK` rather than following `profiles.plan`'s new ENUM,
+  deliberately not touched — billing-critical tables, cosmetic-only benefit,
+  not worth the churn this late). **Real bug found:** `usage_metrics` and
+  `ai_memory` both have an `updated_at` column but were missing the
+  `set_updated_at` trigger every other such column in the schema has.
+  `ai_memory`'s one write call site (`lib/ai/memory.ts`) already sets it
+  manually, so harmless in practice; `usage_metrics`'s
+  `refreshUsageMetrics()` (`lib/db/billing.ts`) does **not**, so the column
+  silently froze at its first-ever value per (user, period) instead of
+  reflecting the most recent refresh — wrong, if not yet user-visible (no UI
+  currently renders it). Fixed additively in
+  `0022_missing_updated_at_triggers.sql`.
+  **API/Server Action consistency (Phase 7):** spot-verified across the
+  highest-stakes files (`admin/actions.ts` — all 16 exports guarded via
+  `guardAdmin()`'s real role re-check; `calendar/actions.ts` — all 10 guarded,
+  one via an equivalent inline check rather than the shared helper, harmless
+  style variance, not a gap) plus the two already fully read this Integration
+  Phase (`ai/actions.ts`, `app/(auth)/actions.ts`). Consistent
+  guard-then-try/catch-then-typed-error-return shape throughout; no
+  unguarded mutation surface found.
+  **Documentation (Phase 9):** README/ARCHITECTURE.md had drifted
+  meaningfully behind the last 4 Integration Sprints' worth of real
+  work — most seriously, both told a new engineer to set `GEMINI_API_KEY`,
+  which no code reads (the AI service reads `API_KEY` and has been
+  OpenRouter-backed since Integration Sprint 5's discovery); both also still
+  described the OneDrive-locking misdiagnosis as fact. Fixed both, plus
+  updated the migration-range references, added every env var introduced
+  since Sprint 6 to README's table, added a "Background jobs (Vercel Cron)"
+  section (the three `/api/cron/*` routes need real scheduler setup or
+  nothing runs automatically in production — wasn't documented anywhere),
+  expanded the project-structure trees to include `lib/jobs`/`notifications`/
+  `webhooks`/`security` and `api/cron`/`api/webhooks/{meta,x}`, and added
+  `docs/SETUP_GUIDES.md` — real per-platform OAuth app registration steps
+  (Meta, LinkedIn, X, YouTube, OpenRouter, Razorpay) with the exact scopes/
+  redirect-URI pattern/env-var names pulled from `lib/integrations/
+  providers.ts` rather than generic guessed instructions, plus an admin
+  console walkthrough.
+  **Final verification (Phase 8/10):** `tsc --noEmit` clean, `eslint` clean,
+  `next build` clean — **all 32 routes**, first full production build this
+  Integration Phase run after the `.next`/`node_modules` junction fix (see
+  Environment above), confirming that fix holds under a real build, not just
+  `next dev`. Dev-server smoke-check: zero server/console errors, landing
+  page serves 200 and loads correctly (verified via DOM/`document` state
+  rather than a visual screenshot — the Browser pane's preview tab reported
+  `document.hidden === true`/no OS focus, which throttles the landing page's
+  `requestAnimationFrame`-driven preloader to a standstill in this specific
+  tooling environment; confirmed by direct code read that the loader is a
+  fixed ~2.2s time-based animation with no dependency on real asset-loading,
+  not an app defect — but genuinely not visually click-through-verified as a
+  result). **Recommend one real, foreground-browser click-through
+  (landing page load, a modal open/close/Tab-cycle, login) before shipping**,
+  same standing caveat every sprint in this environment has carried.
+  **⚠ Needs migrations `0017`–`0022` applied, in order, live** (same
+  "written and verified, not yet run against the live database" status as
+  every migration this Integration Phase — `0013`/`0014`/`0015`/`0016` from
+  earlier sprints carry the same flag; batch-apply in migration order).
 - **Integration Sprint 6 — Platform Infrastructure, Automation & Observability ✅:**
   New migration `0016_platform_infrastructure.sql`: `jobs` (generic queue —
   `job_type`/`status`/`payload`/`payload_hash`/`attempts`/`max_attempts`/
@@ -1267,6 +1414,13 @@ Auth is being built **from scratch in Sprint 1.**
     (`/api/webhooks/meta`, `/api/webhooks/x`) additionally need a real subscription
     registered in each platform's own developer console, which needs a public HTTPS URL —
     not something local dev can do regardless of env vars.
+19. **RC1 — Security & rate limiting:** run migrations `0017_final_rls_hardening.sql`
+    through `0022_missing_updated_at_triggers.sql`, in order — all additive/policy-only,
+    no backfill needed. No new required env vars; rate limiting works immediately once
+    `0018`/`0019` are applied, using the existing service-role key. See
+    [`docs/SETUP_GUIDES.md`](./docs/SETUP_GUIDES.md) for the full per-platform OAuth
+    setup reference (consolidates and supersedes steps 9/14 above for anyone setting
+    up integrations fresh).
 
 ## Known risks / follow-ups
 - **⚠ Migration `0013_fix_is_admin_recursion.sql` written but not yet applied live (see the
@@ -1417,20 +1571,16 @@ Auth is being built **from scratch in Sprint 1.**
   revisit for real dashboard UX in a later sprint.
 - `useCountUp` starts before the SSR reduced-motion value resolves (minor a11y leak).
 - Live auth E2E (real OAuth round-trip, email confirm) unverifiable without your keys.
-- **No rate-limiting anywhere (confirmed again in Sprint 10).** Auth endpoints (login,
-  signup, password-reset request) and the Gemini chat/generation endpoints have no
-  request throttling — cost/abuse exposure is bounded by AI-credit balance and Zod
-  length caps (Sprint 10) but not by request frequency. Was already flagged as
-  "later" since `ARCHITECTURE.md`'s original draft; still the single biggest
-  remaining gap between this codebase and "actually launch-ready."
-- **RLS write-lockdown pattern (Sprint 9/10's `0008`/`0009` "read-only, writes via
-  service-role or a re-checked RPC") has not been applied to `xp_history`,
-  `achievements`, `publishing_logs`, `sync_logs`, `integration_events`** — same root
-  cause as the billing tables Sprint 10 fixed (blanket own-row CRUD from the 0004–0006
-  loop), but lower severity (gamification/operational logs, not paid entitlements) and
-  a materially larger blast radius to fix (5 more data-layer files across growth/
-  scheduling/integrations, none of which can be live-tested in this environment).
-  Recommended as a dedicated follow-up, not bundled into Sprint 10.
+- ~~No rate-limiting anywhere (confirmed again in Sprint 10).~~ **Resolved in
+  Integration Sprint 7** — Postgres-backed rate limiting (`0018`/`0019`,
+  `lib/security/rateLimit.ts`) now covers login/signup/password-reset and
+  every AI entry point. See this sprint's log entry for the design rationale
+  (Postgres over in-memory, fail-open over fail-closed).
+- ~~RLS write-lockdown pattern... has not been applied to `xp_history`,
+  `achievements`, `publishing_logs`, `sync_logs`, `integration_events`.~~
+  **Resolved in Integration Sprint 7** — `0017_final_rls_hardening.sql`
+  closes all five, same pattern as the billing tables. See this sprint's log
+  entry.
 - **Next.js is on 14.2.35, not the 16.x line.** `npm audit` still lists several
   advisories (DoS/cache-poisoning/XSS in image optimization, i18n middleware, CSP
   nonces) only fully resolved on Next 16 — none of the affected features are in use

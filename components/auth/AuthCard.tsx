@@ -2,7 +2,7 @@ import { AlertCircle } from "lucide-react";
 
 const ERRORS: Record<string, string> = {
   oauth: "Google sign-in didn't complete. Please try again.",
-  confirm: "That confirmation link is invalid or has expired.",
+  confirm: "This confirmation link has expired or has already been used. If you've already confirmed your email, you can sign in below.",
   auth: "Something went wrong. Please sign in again.",
 };
 

@@ -14,8 +14,15 @@ export async function GET(request: Request) {
   const next = searchParams.get("next");
   const redirectTo = isSafeRedirect(next) ? next : "/dashboard";
 
+  const supabase = createClient();
+
+  // If the user already has an active session, skip verification and go straight to the destination
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    return NextResponse.redirect(`${origin}${redirectTo}`);
+  }
+
   if (token_hash && type) {
-    const supabase = createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (!error) return NextResponse.redirect(`${origin}${redirectTo}`);
   }

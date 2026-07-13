@@ -41,9 +41,7 @@ export default function UserMenu({ user }: { user: AppUser }) {
         data-cursor="pointer"
         className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] py-1 pl-1 pr-2 transition-colors hover:border-white/20"
       >
-        {user.avatarUrl && 
-         !imgFailed && 
-         !user.avatarUrl.includes("ACg8ocJ-7cSYSfDRO1VckLEGoQkuSLSunfOH8lm0GFTQnEXdhGqBRg") ? (
+        {user.avatarUrl && !imgFailed ? (
           // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied avatar URLs, not a local asset next/image can optimize
           <img 
             src={user.avatarUrl} 

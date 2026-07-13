@@ -1,7 +1,7 @@
 # ARCHITECTURE.md
 ### How UniPost AI is built — folder structure, patterns, conventions, security.
 
-_Updated Sprint 10 (Production Hardening). Sprints 1–2's route/auth architecture below is unchanged in shape — it just has a lot more built on top of it now._
+_Updated Integration Sprint 7 (RC1 — Release Candidate). Sprints 1–2's route/auth architecture below is unchanged in shape — it just has a lot more built on top of it now, including a full real-integration layer (publishing, analytics, AI context, platform infrastructure) added across Integration Sprints 1–7 after the original Sprint 1–10 build._
 
 ## Route architecture (App Router + route groups)
 ```
@@ -28,10 +28,22 @@ app/
     confirm/route.ts    # email OTP / magic-link verification
     oauth/[provider]/{start,callback}/route.ts   # per-platform social-integration OAuth
   api/
-    ai/chat/route.ts             # streaming Gemini chat
-    webhooks/razorpay/route.ts   # payment webhook (no user session — signature-verified)
+    ai/chat/route.ts                          # streaming AI chat (OpenRouter-backed, see AI services below)
+    cron/publish/route.ts                     # publishes due scheduled posts (Vercel Cron)
+    cron/analytics/route.ts                   # syncs analytics from connected accounts (Vercel Cron)
+    cron/jobs/route.ts                        # drains the generic async job queue (Vercel Cron)
+    webhooks/razorpay/route.ts                # payment webhook (no user session — signature-verified)
+    webhooks/meta/route.ts                    # Instagram/Facebook webhook (GET handshake + signature-verified POST)
+    webhooks/x/route.ts                       # X (Twitter) webhook (signature-verified)
 middleware.ts           # session refresh + route protection
 ```
+All three `api/cron/*` routes require `Authorization: Bearer ${CRON_SECRET}` — see
+README's [Background jobs](./README.md#background-jobs-vercel-cron) section for the
+Vercel Cron setup. All three `api/webhooks/*` routes are unauthenticated by session
+(providers don't carry a UniPost cookie) and instead verify a provider-specific
+signature/token per request (`lib/webhooks/verify.ts`), then log every inbound event
+through `lib/webhooks/log.ts` keyed on a SHA-256 payload hash for idempotency — a
+provider's retry of the same payload is reported as a duplicate, not reprocessed.
 Route groups `(auth)` and `(app)` keep unauth vs. authenticated shells separate
 without affecting the URL. Landing stays at `/`. Every page under `(app)/*`
 (including `/admin/*`) is protected **and noindex'd** — see Security model below.
@@ -78,10 +90,31 @@ without affecting the URL. Landing stays at `/`. Every page under `(app)/*`
   the service-role client, always with its own app-level `guardAdmin()`/actor check, since
   RLS doesn't apply there. Small "leaf" modules (`lib/db/plan.ts`, `lib/db/xp.ts`) exist
   specifically to avoid import cycles between larger modules — intentional, not a smell.
-- **Services**: `lib/ai/*` (Gemini, REST/SSE, no SDK), `lib/billing/*` (Razorpay + the
-  plan-limits engine), `lib/integrations/*` (per-platform OAuth + token crypto),
-  `lib/schedule/*` (calendar/queue/publishing), `lib/growth/*` (analytics/score/coach) —
-  never called from the client directly.
+- **Services**: `lib/ai/*` (OpenRouter client + streaming, REST/SSE, no SDK — plus the
+  Context Service/Memory/Prompt Builder layer, see AI architecture below),
+  `lib/billing/*` (Razorpay + the plan-limits engine), `lib/integrations/*`
+  (per-platform OAuth + token crypto), `lib/schedule/*` (calendar/queue/publishing,
+  plus `lib/schedule/publishers/*` — the real per-platform publish adapters),
+  `lib/analytics/*` (real per-platform analytics sync adapters, mirrors the publisher
+  registry pattern), `lib/growth/*` (score/coach/simulated-backfill for platforms
+  without a real analytics provider yet), `lib/jobs/*` (generic async job queue +
+  workers for growth reports, notification delivery, retention cleanup),
+  `lib/notifications/*` (in-app + best-effort email delivery), `lib/webhooks/*`
+  (inbound signature verification + idempotent event logging), `lib/security/*`
+  (Postgres-backed rate limiting) — never called from the client directly.
+
+### AI architecture (Context Service pattern)
+`lib/ai/context.ts::getCreatorContext()` is the single aggregation point every AI
+call site goes through — it pulls recent posts, analytics, goals, and inferred
+`ai_memory` into one `CreatorContext` object, cached 20 minutes in `ai_context_cache`
+(`lib/ai/contextCache.ts`, a dependency-free leaf module so `lib/db/schedule.ts` and
+`lib/db/integrations.ts` can invalidate the cache on a real event without a circular
+import back into the aggregator). `lib/ai/promptBuilder.ts` turns that context into
+short, purpose-specific summaries (chat system prompt, action prompt, studio prompt) —
+**raw analytics rows are never sent to the model directly**, only these summaries.
+`lib/ai/memory.ts::inferAndUpdateMemory()` runs opportunistically after AI actions,
+heuristically updating `ai_memory` (favorite platforms, emoji/hashtag/CTA style) from
+the creator's own recent posts — best-effort, never blocks the response that triggered it.
 - **Design inheritance:** authed screens use the same tokens, `Button`, `GlassCard`,
   `Container`, type scale and aurora accents as the landing.
 - **Naming:** components `PascalCase.tsx`, hooks `useX.ts`, utils/services `camelCase.ts`.
@@ -90,9 +123,10 @@ without affecting the URL. Landing stays at `/`. Every page under `(app)/*`
 See [`README.md`](./README.md#environment-variables) for the full table with which are
 required vs. optional-with-a-working-stub. Public (browser): `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`. Server-only:
-`SUPABASE_SERVICE_ROLE_KEY` (never exposed), `GEMINI_API_KEY`, `INTEGRATIONS_SECRET_KEY`,
-`RAZORPAY_KEY_SECRET`. Defined in `.env.example` — that file should only ever contain
-placeholder-looking values, never anything that resembles a real key.
+`SUPABASE_SERVICE_ROLE_KEY` (never exposed), `API_KEY` (OpenRouter — despite the name,
+not a Gemini key), `INTEGRATIONS_SECRET_KEY`, `CRON_SECRET`, `RAZORPAY_KEY_SECRET`.
+Defined in `.env.example` — that file should only ever contain placeholder-looking
+values, never anything that resembles a real key.
 
 ## Security model
 - Cookie-based sessions (httpOnly, managed by `@supabase/ssr`).
@@ -116,12 +150,33 @@ placeholder-looking values, never anything that resembles a real key.
     Migrations `0001`–`0007` don't — not a vulnerability (unauthenticated `auth.uid()` is
     `NULL`, never matches `= user_id`), just a performance-pattern inconsistency, flagged
     in `PROJECT_STATUS.md` as a deliberate, not-yet-done follow-up.
+  - A handful of tables (`xp_history`, `achievements`, `publishing_logs`, `sync_logs`,
+    `integration_events`) originally shipped with blanket own-row write policies despite
+    being system-computed — the same class of gap `0009` closed on the billing tables.
+    Closed for good in migration `0017_final_rls_hardening.sql` (Integration Sprint 7):
+    write policies dropped, and every write call site converted to the service-role
+    admin client with an app-level check, same pattern as everywhere else in this list.
+  - Views default to `SECURITY DEFINER`-equivalent behavior unless created with
+    `security_invoker = true` (Postgres 15+), which silently bypasses RLS on the
+    underlying table for that view's queries. `public.publishing_queue` was fixed in
+    migration `0021` — it was never actually exploitable (the view has its own hardcoded
+    `user_id = auth.uid()` predicate) but the implicit definer-mode was a real gap closed
+    for correctness and to satisfy Supabase's security linter. Any new view should be
+    created with `security_invoker = true` from the start.
 - All protected **pages** are guarded at two layers: middleware (allow-list, see Auth
   flow) + server-component check. Protected **mutations** additionally re-check
   authorization inside the Server Action itself (e.g. every admin action starts with
   `guardAdmin()`) — never rely on the page-level gate alone for a mutation.
-- Zod validation on every Server Action / Route Handler input that reaches a paid Gemini
+- Zod validation on every Server Action / Route Handler input that reaches a paid AI
   call or a database write.
+- **Rate limiting** (`lib/security/rateLimit.ts`, migrations `0018`/`0019`): Postgres-backed
+  (fixed-window counter via a `SECURITY DEFINER` function, `private.check_rate_limit`,
+  wrapped by a `service_role`-only `public.check_rate_limit` so PostgREST's `.rpc()` can
+  reach it) rather than in-memory, since this app deploys to serverless instances that
+  don't share memory. Wired into `login`/`signup`/`requestPasswordReset`
+  (`app/(auth)/actions.ts`) and every AI entry point (`/api/ai/chat`, `runAction`,
+  `analyzeMediaForPost`). Fails open on a DB error (an unavailable rate limiter shouldn't
+  block legitimate users) — contrast with credit-balance checks, which fail closed.
 - **Security headers** (`next.config.mjs`): CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Permissions-Policy`.
   The CSP allow-lists Supabase and Razorpay's known origins by name; `'unsafe-eval'` stays
@@ -130,11 +185,14 @@ placeholder-looking values, never anything that resembles a real key.
 - Open-redirect guard: `lib/utils.ts::isSafeRedirect()` — any user-suppliable redirect
   target must go through this (rejects `//host`-style protocol-relative URLs, not just
   scheme-based ones).
-- **No rate-limiting yet** on auth or AI endpoints — a known, tracked gap (see
-  `PROJECT_STATUS.md`), not silently missing.
 
 ## Build/runtime notes
-- `.next` junctioned to `%TEMP%\unipost-next` (OneDrive workaround).
+- `.next` junctioned to `%TEMP%\unipost-build\next`, with a sibling
+  `%TEMP%\unipost-build\node_modules` junction back to the real `node_modules` — see
+  README's [Known local-environment quirks](./README.md#known-local-environment-quirks)
+  for why the sibling junction is required, not optional (Node's module resolution for
+  Next's `_document.js`-style CommonJS shims walks up from `.next`'s own location on
+  disk, and needs `node_modules` in that walk-up chain).
 - `transpilePackages: ["three"]`; `optimizePackageImports` for lucide/framer.
 - `gsap`/`ScrollTrigger` are dynamically imported (`AppProviders.tsx`, mirroring the
   pre-existing pattern in `hooks/useLenis.ts`) specifically so they don't end up in the
